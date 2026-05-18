@@ -1,39 +1,140 @@
-import os
+﻿import os
 import pandas as pd
+import psycopg2
+from psycopg2.extras import execute_batch
 from dotenv import load_dotenv
-from sqlalchemy import create_engine, text
 
 load_dotenv()
 
-host = os.getenv('POSTGRES_HOST', 'localhost')
-port = os.getenv('POSTGRES_PORT', '5432')
-db = os.getenv('POSTGRES_DB', 'logvision')
-user = os.getenv('POSTGRES_USER', 'postgres')
-password = os.getenv('POSTGRES_PASSWORD', 'postgres')
-url = f'postgresql+psycopg2://{user}:{password}@{host}:{port}/{db}'
+HOST = os.getenv("POSTGRES_HOST", "localhost")
+PORT = os.getenv("POSTGRES_PORT", "55432")
+DB = os.getenv("POSTGRES_DB", "logs")
+USER = os.getenv("POSTGRES_USER", "logs_user")
+PASSWORD = os.getenv("POSTGRES_PASSWORD", "logs_pass")
 
-try:
-    df = pd.read_csv('outputs/model_comparison.csv')
-except Exception as e:
-    raise SystemExit(f'Error reading outputs/model_comparison.csv: {e}')
+CSV_PATH = "outputs/model_comparison.csv"
 
-engine = create_engine(url)
-with engine.begin() as conn:
-    for _, r in df.iterrows():
-        conn.execute(text('''
-            INSERT INTO ml_log_sequence(sequence_uid, application_key, component_name, start_timestamp, end_timestamp, event_ids, final_anomaly_score, final_anomaly_label, updated_at)
-            VALUES (:sequence_uid, :application_key, :component_name, :start_timestamp, :end_timestamp, :event_ids, :final_anomaly_score, :final_anomaly_label, NOW())
-            ON CONFLICT (sequence_uid) DO UPDATE SET
-              final_anomaly_score=EXCLUDED.final_anomaly_score,
-              final_anomaly_label=EXCLUDED.final_anomaly_label,
-              updated_at=NOW()
-        '''), r.to_dict())
+MODEL_NAME = "ensemble_logbert_like"
+MODEL_VERSION = "v1"
 
-        ids = [x for x in str(r['event_ids']).split('|') if x]
-        for eid in ids:
-            conn.execute(text('''
-                INSERT INTO ml_event_score(base_event_id, sequence_uid, model_name, model_version, anomaly_score)
-                VALUES (:base_event_id, :sequence_uid, 'ensemble_logbert_like', 'v1', :anomaly_score)
-            '''), {'base_event_id': int(eid), 'sequence_uid': r['sequence_uid'], 'anomaly_score': float(r['final_anomaly_score'])})
+dsn = f"host={HOST} port={PORT} dbname={DB} user={USER} password={PASSWORD}"
 
-print('Scores written to PostgreSQL')
+if not os.path.exists(CSV_PATH):
+    raise SystemExit(f"Missing file: {CSV_PATH}")
+
+df = pd.read_csv(CSV_PATH)
+
+required = [
+    "sequence_uid",
+    "event_ids",
+    "final_anomaly_score",
+    "final_anomaly_label",
+]
+
+missing = [c for c in required if c not in df.columns]
+if missing:
+    raise SystemExit(f"Missing columns in {CSV_PATH}: {missing}")
+
+rows = []
+
+for _, r in df.iterrows():
+    sequence_uid = str(r["sequence_uid"])
+    anomaly_score = float(r["final_anomaly_score"])
+    anomaly_label = str(r["final_anomaly_label"])
+
+    event_ids_raw = str(r["event_ids"])
+
+    for eid in event_ids_raw.split(","):
+        eid = eid.strip()
+
+        if not eid:
+            continue
+
+        try:
+            base_event_id = int(eid)
+        except ValueError:
+            print(f"Skipping invalid event id: {eid}")
+            continue
+
+        rows.append(
+            (
+                base_event_id,
+                sequence_uid,
+                MODEL_NAME,
+                MODEL_VERSION,
+                anomaly_score,
+                anomaly_label,
+            )
+        )
+
+print(f"Prepared rows for PostgreSQL: {len(rows)}")
+
+with psycopg2.connect(dsn) as conn:
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS ml_event_score (
+                id BIGSERIAL PRIMARY KEY,
+                base_event_id BIGINT NOT NULL,
+                sequence_uid TEXT NOT NULL,
+                model_name TEXT NOT NULL,
+                model_version TEXT NOT NULL,
+                anomaly_score DOUBLE PRECISION NOT NULL,
+                anomaly_label TEXT,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            );
+            """
+        )
+
+        cur.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_ml_event_score_base_event_id
+            ON ml_event_score(base_event_id);
+            """
+        )
+
+        cur.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_ml_event_score_sequence_uid
+            ON ml_event_score(sequence_uid);
+            """
+        )
+
+        cur.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_ml_event_score_model
+            ON ml_event_score(model_name, model_version);
+            """
+        )
+
+        # Nettoyer l'ancien run du même modèle pour éviter les doublons.
+        cur.execute(
+            """
+            DELETE FROM ml_event_score
+            WHERE model_name = %s
+              AND model_version = %s;
+            """,
+            (MODEL_NAME, MODEL_VERSION),
+        )
+
+        execute_batch(
+            cur,
+            """
+            INSERT INTO ml_event_score(
+                base_event_id,
+                sequence_uid,
+                model_name,
+                model_version,
+                anomaly_score,
+                anomaly_label
+            )
+            VALUES (%s, %s, %s, %s, %s, %s);
+            """,
+            rows,
+            page_size=1000,
+        )
+
+    conn.commit()
+
+print("Scores written to PostgreSQL")
+print(f"Inserted rows: {len(rows)}")

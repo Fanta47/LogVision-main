@@ -14,9 +14,18 @@ export default function LoginPage() {
   const [password, setPassword] = useState("demo1234");
   const [show, setShow] = useState(false);
   const [loading, setLoading] = useState(false);
+
   function submit(e: React.FormEvent) {
-    e.preventDefault(); setLoading(true);
-    try { login(email, password); router.push("/dashboard"); } catch (err) { toast.error(err instanceof Error ? err.message : "Unable to sign in"); } finally { setLoading(false); }
+    e.preventDefault();
+    setLoading(true);
+    try {
+      login(email, password);
+      router.push("/dashboard");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Unable to sign in");
+    } finally {
+      setLoading(false);
+    }
   }
   return <div className="relative flex min-h-screen overflow-hidden">
     <LoginBackground />
@@ -43,7 +52,7 @@ export default function LoginPage() {
           <label className="flex items-center gap-2 text-sm text-muted-foreground"><input type="checkbox" className="rounded border-border" defaultChecked />Se souvenir de moi</label>
           <a href="/forgot-password" className="text-sm text-primary hover:underline">Mot de passe oublié ?</a>
         </div>
-        <Button disabled={loading} className="mt-6 h-12 w-full rounded-lg text-lg">{loading ? "Connexion..." : "Se connecter"}</Button>
+        <Button type="submit" disabled={loading} className="mt-6 h-12 w-full rounded-lg text-lg">{loading ? "Connexion..." : "Se connecter"}</Button>
       </form>
       <div className="my-6 flex items-center gap-4 text-sm text-muted-foreground"><div className="h-px flex-1 bg-border" /><span>ou</span><div className="h-px flex-1 bg-border" /></div>
       <button type="button" className="h-12 w-full rounded-lg border border-border bg-secondary font-semibold text-foreground">Se connecter avec Keycloak SSO</button>

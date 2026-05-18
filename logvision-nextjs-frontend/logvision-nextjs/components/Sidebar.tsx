@@ -1,76 +1,114 @@
 ﻿"use client";
+
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, Upload, Search, AlertTriangle, Brain, Activity, Gauge, Settings, User, ChevronLeft, ChevronRight, FileText, Siren, ShieldAlert, Users, Shield, Bell, Server, Settings2 } from "lucide-react";
-import { useState } from "react";
-import { cn } from "@/lib/utils";
-import { Role } from "@/lib/auth";
-import { VermegLogo } from "./VermegLogo";
+import {
+  LayoutDashboard,
+  FileText,
+  AlertTriangle,
+  Search,
+  Clock3,
+  Upload,
+  BarChart3,
+  User,
+} from "lucide-react";
+
+type SidebarProps = {
+  role?: string;
+};
 
 type NavItem = {
   label: string;
   href: string;
-  icon: any;
-  roles: Role[];
+  icon: React.ElementType;
 };
 
-const nav: NavItem[] = [
-  { label: "Overview", href: "/dashboard", icon: BarChart3, roles: ["user", "manager", "admin"] },
-  { label: "Ingestion", href: "/dashboard/ingest", icon: Upload, roles: ["user", "admin"] },
-  { label: "Logs", href: "/dashboard/logs", icon: Search, roles: ["user", "manager", "admin"] },
-  { label: "Alerts", href: "/dashboard/alerts", icon: Siren, roles: ["manager", "admin"] },
-  { label: "Incidents", href: "/dashboard/incidents", icon: ShieldAlert, roles: ["manager", "admin"] },
-  { label: "Anomalies", href: "/dashboard/anomalies", icon: AlertTriangle, roles: ["user", "manager", "admin"] },
-  { label: "Predictions", href: "/dashboard/predictions", icon: Brain, roles: ["manager", "admin"] },
-  { label: "Reports", href: "/dashboard/reports", icon: FileText, roles: ["manager", "admin"] },
-  { label: "Manager", href: "/dashboard/manager", icon: Users, roles: ["manager", "admin"] },
-  { label: "ML Models", href: "/dashboard/models", icon: Activity, roles: ["user", "manager", "admin"] },
-  { label: "Kibana", href: "/dashboard/kibana", icon: Gauge, roles: ["user", "manager", "admin"] },
-  { label: "Profile", href: "/dashboard/profile", icon: User, roles: ["user", "manager", "admin"] },
-  { label: "Admin System", href: "/dashboard/admin/system", icon: Server, roles: ["admin"] },
-  { label: "Admin Users", href: "/dashboard/admin/users", icon: Users, roles: ["admin"] },
-  { label: "Admin Roles", href: "/dashboard/admin/roles", icon: Shield, roles: ["admin"] },
-  { label: "Admin Alerts", href: "/dashboard/admin/alerts", icon: Bell, roles: ["admin"] },
-  { label: "Admin Config", href: "/dashboard/admin/config", icon: Settings2, roles: ["admin"] },
-  { label: "Settings", href: "/dashboard/settings", icon: Settings, roles: ["admin"] },
+const operations: NavItem[] = [
+  { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+  { label: "Logs", href: "/dashboard/logs", icon: FileText },
+  { label: "Alerts", href: "/dashboard/alerts", icon: AlertTriangle },
+  { label: "Anomalies", href: "/dashboard/anomalies", icon: Search },
+  { label: "Incidents", href: "/dashboard/incidents", icon: Clock3 },
 ];
 
-export function Sidebar({ role }: { role: Role }) {
-  const [collapsed, setCollapsed] = useState(false);
-  const path = usePathname();
-  const items = nav.filter((n) => n.roles.includes(role));
+const intelligence: NavItem[] = [
+  { label: "Ingestion", href: "/dashboard/ingest", icon: Upload },
+  { label: "Reports", href: "/dashboard/reports", icon: BarChart3 },
+];
 
+const account: NavItem[] = [
+  { label: "Profile", href: "/dashboard/profile", icon: User },
+];
+
+function isActive(pathname: string, href: string) {
+  if (href === "/dashboard") return pathname === "/dashboard";
+  return pathname.startsWith(href);
+}
+
+function NavSection({
+  title,
+  items,
+  pathname,
+}: {
+  title: string;
+  items: NavItem[];
+  pathname: string;
+}) {
   return (
-    <aside className={cn("flex h-screen flex-col border-r border-sidebar-border bg-sidebar transition-all", collapsed ? "w-16" : "w-60")}>
-      <div className="flex h-16 items-center justify-center border-b border-sidebar-border px-3">
-        <VermegLogo small={collapsed} />
-      </div>
-      <nav className="flex-1 space-y-1 overflow-y-auto p-2 pt-4">
+    <section className="mt-8">
+      <p className="px-5 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-600">
+        {title}
+      </p>
+
+      <nav className="mt-3 space-y-1 px-3">
         {items.map((item) => {
-          const active = path === item.href;
           const Icon = item.icon;
+          const active = isActive(pathname, item.href);
+
           return (
             <Link
               key={item.href}
               href={item.href}
-              className={cn(
-                "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
-                active ? "bg-sidebar-accent text-primary" : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-foreground"
-              )}
+              className={[
+                "group flex items-center gap-3 rounded-lg px-4 py-3 text-[15px] font-semibold transition",
+                active
+                  ? "bg-[#101722] text-red-400"
+                  : "text-slate-400 hover:bg-[#101722]/80 hover:text-slate-100",
+              ].join(" ")}
             >
-              <Icon className="h-4 w-4 shrink-0" />
-              {!collapsed && <span className="truncate">{item.label}</span>}
+              <Icon
+                className={[
+                  "h-5 w-5 transition",
+                  active ? "text-red-400" : "text-slate-500 group-hover:text-red-400",
+                ].join(" ")}
+              />
+              <span>{item.label}</span>
             </Link>
           );
         })}
       </nav>
-      <div className="border-t border-sidebar-border p-2">
-        <button
-          onClick={() => setCollapsed(!collapsed)}
-          className="flex w-full items-center justify-center rounded-md p-2 text-muted-foreground hover:bg-sidebar-accent hover:text-foreground"
-        >
-          {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
-        </button>
+    </section>
+  );
+}
+
+export function Sidebar({ role }: SidebarProps) {
+  const pathname = usePathname();
+
+  return (
+    <aside className="flex h-screen w-[300px] shrink-0 flex-col border-r border-white/10 bg-[#05080d]">
+      <div className="flex h-[78px] items-center border-b border-white/10 px-8">
+        <div className="flex items-center gap-3">
+          <div className="h-9 w-2 skew-x-[-15deg] bg-red-500" />
+          <span className="text-3xl font-bold tracking-[0.18em] text-white">
+            logvision
+          </span>
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto py-2">
+        <NavSection title="Operations" items={operations} pathname={pathname} />
+        <NavSection title="Intelligence" items={intelligence} pathname={pathname} />
+        <NavSection title="Account" items={account} pathname={pathname} />
       </div>
     </aside>
   );

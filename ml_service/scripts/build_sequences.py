@@ -1,46 +1,116 @@
 import hashlib
+import os
 import pandas as pd
 
+
+INPUT_PATH = "data/events_normalized.csv"
+OUTPUT_PATH = "data/sequences.csv"
+
 WINDOW_SIZE = 20
-STEP_SIZE = 5
+STRIDE = 1
 
-try:
-    df = pd.read_csv('data/events_normalized.csv')
-except Exception as e:
-    raise SystemExit(f'Error read data/events_normalized.csv: {e}')
 
-df['event_timestamp'] = pd.to_datetime(df['event_timestamp'], errors='coerce')
-df = df.dropna(subset=['event_timestamp']).copy()
+def safe_token(value):
+    if pd.isna(value):
+        return "UNKNOWN"
+    value = str(value).strip()
+    if not value:
+        return "UNKNOWN"
+    return (
+        value.upper()
+        .replace(" ", "_")
+        .replace("-", "_")
+        .replace("/", "_")
+        .replace("\\", "_")
+        .replace(".", "_")
+    )
 
-rows = []
-for (app, comp), g in df.groupby(['application_key', 'component_name'], dropna=False):
-    g = g.sort_values('event_timestamp')
-    n = len(g)
-    for i in range(0, max(1, n - WINDOW_SIZE + 1), STEP_SIZE):
-        w = g.iloc[i:i+WINDOW_SIZE]
-        if len(w) == 0:
+
+def make_event_token(row):
+    family = safe_token(row.get("log_family", "UNKNOWN"))
+    event_type = safe_token(row.get("event_type", "UNKNOWN"))
+
+    if family == "UNKNOWN" and event_type == "UNKNOWN":
+        return "UNKNOWN_GENERIC"
+
+    return f"{family}_{event_type}"
+
+
+def make_sequence_uid(event_ids):
+    raw = ",".join(str(x) for x in event_ids)
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
+def main():
+    if not os.path.exists(INPUT_PATH):
+        raise SystemExit(f"Error: {INPUT_PATH} not found")
+
+    df = pd.read_csv(INPUT_PATH)
+
+    required = [
+        "id",
+        "event_timestamp",
+        "application_key",
+        "component_name",
+        "log_family",
+        "event_type",
+    ]
+
+    missing = [c for c in required if c not in df.columns]
+    if missing:
+        raise SystemExit(f"Missing required columns: {missing}")
+
+    df["event_timestamp"] = pd.to_datetime(df["event_timestamp"], errors="coerce")
+    df = df.dropna(subset=["event_timestamp"])
+
+    df["application_key"] = df["application_key"].fillna("unknown_app").astype(str)
+    df["component_name"] = df["component_name"].fillna("unknown_component").astype(str)
+    df["event_token"] = df.apply(make_event_token, axis=1)
+
+    df = df.sort_values(["application_key", "component_name", "event_timestamp", "id"])
+
+    rows = []
+
+    grouped = df.groupby(["application_key", "component_name"], dropna=False)
+
+    for (app, component), g in grouped:
+        g = g.sort_values(["event_timestamp", "id"]).reset_index(drop=True)
+
+        if len(g) < WINDOW_SIZE:
             continue
-        event_ids = w['id'].astype(str).tolist()
-        sequence_text = ' [SEP] '.join(w['ml_text'].fillna('').astype(str).tolist())
-        start_ts = w['event_timestamp'].iloc[0]
-        end_ts = w['event_timestamp'].iloc[-1]
-        uid = hashlib.sha256(f"{app}|{comp}|{start_ts}|{end_ts}|{'|'.join(event_ids)}".encode()).hexdigest()
-        rows.append({
-            'sequence_uid': uid,
-            'application_key': app,
-            'component_name': comp,
-            'start_timestamp': start_ts,
-            'end_timestamp': end_ts,
-            'event_ids': '|'.join(event_ids),
-            'sequence_text': sequence_text,
-            'error_count': int((w['log_level'].astype(str).str.lower() == 'error').sum()),
-            'warning_count': int((w['log_level'].astype(str).str.lower().isin(['warn', 'warning'])).sum()),
-            'sla_not_found_count': int((w['event_type'].astype(str) == 'sla_lookup').sum() and (w.get('details', pd.Series(['']*len(w))).astype(str).str.contains('NOT FOUND', case=False, na=False).sum())),
-            'sql_query_count': int((w['event_type'].astype(str) == 'sql_query').sum()),
-            'unique_event_type_count': int(w['event_type'].nunique()),
-            'duration_ms': int((end_ts - start_ts).total_seconds() * 1000),
-        })
 
-out = pd.DataFrame(rows)
-out.to_csv('data/sequences.csv', index=False)
-print(f'Sequences built: {len(out)} -> data/sequences.csv')
+        for start in range(0, len(g) - WINDOW_SIZE + 1, STRIDE):
+            window = g.iloc[start:start + WINDOW_SIZE]
+
+            event_ids = window["id"].astype(str).tolist()
+            tokens = window["event_token"].astype(str).tolist()
+
+            rows.append({
+                "sequence_uid": make_sequence_uid(event_ids),
+                "application_key": app,
+                "component_name": component,
+                "start_timestamp": window["event_timestamp"].iloc[0],
+                "end_timestamp": window["event_timestamp"].iloc[-1],
+                "event_ids": ",".join(event_ids),
+                "sequence_text": " ".join(tokens),
+                "window_size": WINDOW_SIZE,
+                "stride": STRIDE,
+                "label": "",
+                "anomaly_candidate": "",
+                "severity": "unscored",
+            })
+
+    out = pd.DataFrame(rows)
+
+    os.makedirs("data", exist_ok=True)
+    out.to_csv(OUTPUT_PATH, index=False)
+
+    print(f"Sequences built: {len(out)} -> {OUTPUT_PATH}")
+
+    if len(out) > 0:
+        print("Sample sequence:")
+        print(out[["sequence_uid", "sequence_text"]].head(1).to_string(index=False))
+
+
+if __name__ == "__main__":
+    main()

@@ -1,11 +1,16 @@
 node_modules/
 __pycache__/
 *.pyc
+.venv/
+venv/
 
 # Logs & data
 logs/
 uploads/
 *.log
+backup_logs_before_dedup.sql
+ml_service/data/*.csv
+ml_service/outputs/
 
 # Elasticsearch & Postgres data
 esdata/
@@ -14,6 +19,13 @@ pgdata/
 # Env & secrets
 .env
 *.env
+.env.*
+!.env.example
 
 # VS Code
 .vscode/
+
+# Frontend build artifacts
+.next/
+next_build_log.txt
+*.tsbuildinfo

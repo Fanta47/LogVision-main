@@ -17,7 +17,7 @@ ES_USER = os.getenv("ES_USER", "elastic")
 ES_PASSWORD = os.getenv("ES_PASSWORD", "changeme123")
 ES_VERIFY_CERTS = os.getenv("ES_VERIFY_CERTS", "false").lower() == "true"
 
-INDEX_NAME = os.getenv("ES_ML_INDEX", "logvision-ml-anomalies-v1")
+INDEX_NAME = os.getenv("ES_ML_INDEX", "logvision-ml-scores-v4")
 BATCH_SIZE = int(os.getenv("EXPORT_BATCH_SIZE", "1000"))
 
 
@@ -32,21 +32,26 @@ def create_index_if_missing(es: Elasticsearch) -> None:
                 "sequence_uid": {"type": "keyword"},
                 "application_key": {"type": "keyword"},
                 "component_name": {"type": "keyword"},
+
                 "model_name": {"type": "keyword"},
                 "model_version": {"type": "keyword"},
+                "primary_model": {"type": "keyword"},
+
                 "anomaly_label": {"type": "keyword"},
                 "anomaly_score": {"type": "float"},
+
+                "final_anomaly_label": {"type": "keyword"},
+                "final_anomaly_score": {"type": "float"},
+
+                "logbert_like_score": {"type": "float"},
+                "iforest_baseline_score": {"type": "float"},
+                "knn_baseline_score": {"type": "float"},
+
                 "event_count": {"type": "integer"},
+                "event_ids": {"type": "keyword"},
+
                 "start_timestamp": {"type": "date"},
                 "end_timestamp": {"type": "date"},
-                "log_families": {"type": "keyword"},
-                "event_types": {"type": "keyword"},
-                "sla_found_count": {"type": "integer"},
-                "sla_not_found_count": {"type": "integer"},
-                "technical_error_count": {"type": "integer"},
-                "persistence_event_count": {"type": "integer"},
-                "event_ids": {"type": "keyword"},
-                "details_preview": {"type": "text"},
                 "exported_at": {"type": "date"},
             }
         }
@@ -64,32 +69,24 @@ def fetch_sequence_scores():
 
     query = """
         SELECT
-            s.sequence_uid,
-            MIN(e.application_key) AS application_key,
-            MIN(e.component_name) AS component_name,
-            MAX(s.model_name) AS model_name,
-            MAX(s.model_version) AS model_version,
-            MAX(s.anomaly_score) AS anomaly_score,
-            CASE
-                WHEN MAX(s.anomaly_score) >= 0.70 THEN 'anomalous'
-                WHEN MAX(s.anomaly_score) >= 0.30 THEN 'suspicious'
-                ELSE 'normal'
-            END AS anomaly_label,
-            MIN(e.event_timestamp) AS start_timestamp,
-            MAX(e.event_timestamp) AS end_timestamp,
-            COUNT(*) AS event_count,
-            ARRAY_AGG(e.id ORDER BY e.event_timestamp, e.id) AS event_ids,
-            ARRAY_AGG(DISTINCT e.log_family) AS log_families,
-            ARRAY_AGG(DISTINCT e.event_type) AS event_types,
-            SUM(CASE WHEN e.event_type = 'sla_found' THEN 1 ELSE 0 END) AS sla_found_count,
-            SUM(CASE WHEN e.event_type = 'sla_not_found' THEN 1 ELSE 0 END) AS sla_not_found_count,
-            SUM(CASE WHEN e.event_type = 'technical_error' THEN 1 ELSE 0 END) AS technical_error_count,
-            SUM(CASE WHEN e.log_family = 'persistence' THEN 1 ELSE 0 END) AS persistence_event_count,
-            LEFT(STRING_AGG(COALESCE(e.details, ''), ' || ' ORDER BY e.event_timestamp, e.id), 1000) AS details_preview
-        FROM ml_event_score s
-        JOIN base_event e ON e.id = s.base_event_id
-        GROUP BY s.sequence_uid
-        ORDER BY MAX(s.anomaly_score) DESC;
+            sequence_uid,
+            application_key,
+            component_name,
+            start_timestamp,
+            end_timestamp,
+            event_ids,
+            iforest_baseline_score,
+            knn_baseline_score,
+            logbert_like_score,
+            final_anomaly_score,
+            final_anomaly_label,
+            model_name,
+            model_version,
+            array_length(string_to_array(event_ids, ','), 1) AS event_count
+        FROM ml_sequence_score
+        WHERE model_name = 'logbert_like_primary'
+          AND model_version = 'v4'
+        ORDER BY final_anomaly_score DESC, end_timestamp DESC;
     """
 
     with psycopg2.connect(dsn) as conn:
@@ -102,28 +99,51 @@ def fetch_sequence_scores():
                 yield rows
 
 
+def to_iso(value):
+    if value is None:
+        return None
+    if hasattr(value, "isoformat"):
+        return value.isoformat()
+    return str(value)
+
+
+def to_float(value):
+    return float(value or 0)
+
+
 def to_es_action(row: dict) -> dict:
     sequence_uid = row["sequence_uid"]
+
+    event_ids_raw = str(row.get("event_ids") or "")
+    event_ids = [x.strip() for x in event_ids_raw.split(",") if x.strip()]
+
+    final_score = to_float(row["final_anomaly_score"])
+    final_label = row["final_anomaly_label"]
 
     doc = {
         "sequence_uid": sequence_uid,
         "application_key": row["application_key"],
         "component_name": row["component_name"],
+
         "model_name": row["model_name"],
         "model_version": row["model_version"],
-        "anomaly_score": float(row["anomaly_score"] or 0),
-        "anomaly_label": row["anomaly_label"],
-        "start_timestamp": row["start_timestamp"].isoformat() if row["start_timestamp"] else None,
-        "end_timestamp": row["end_timestamp"].isoformat() if row["end_timestamp"] else None,
-        "event_count": int(row["event_count"] or 0),
-        "event_ids": [str(x) for x in row["event_ids"]] if row["event_ids"] else [],
-        "log_families": row["log_families"] or [],
-        "event_types": row["event_types"] or [],
-        "sla_found_count": int(row["sla_found_count"] or 0),
-        "sla_not_found_count": int(row["sla_not_found_count"] or 0),
-        "technical_error_count": int(row["technical_error_count"] or 0),
-        "persistence_event_count": int(row["persistence_event_count"] or 0),
-        "details_preview": row["details_preview"] or "",
+        "primary_model": "logbert_like_v4",
+
+        "anomaly_score": final_score,
+        "anomaly_label": final_label,
+
+        "final_anomaly_score": final_score,
+        "final_anomaly_label": final_label,
+
+        "logbert_like_score": to_float(row["logbert_like_score"]),
+        "iforest_baseline_score": to_float(row["iforest_baseline_score"]),
+        "knn_baseline_score": to_float(row["knn_baseline_score"]),
+
+        "event_count": int(row["event_count"] or len(event_ids)),
+        "event_ids": event_ids,
+
+        "start_timestamp": to_iso(row["start_timestamp"]),
+        "end_timestamp": to_iso(row["end_timestamp"]),
         "exported_at": datetime.utcnow().isoformat(),
     }
 
@@ -151,7 +171,6 @@ def main():
     for rows in fetch_sequence_scores():
         actions = [to_es_action(row) for row in rows]
         ok, errors = helpers.bulk(es, actions, raise_on_error=False)
-
         total += ok
         print(f"Exported batch: {ok} docs, total={total}")
 

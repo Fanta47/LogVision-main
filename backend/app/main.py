@@ -10,6 +10,7 @@ from app.api.routes.ml import router as ml_router
 from app.api.routes.search import router as search_router
 from app.api.routes.upload_logs import router as upload_logs_router
 from app.api.routes.admin_system import router as admin_system_router
+from app.api.routes.admin import router as admin_router
 
 
 app = FastAPI(title="LogVision Backend")
@@ -41,6 +42,7 @@ app.include_router(ml_router)
 app.include_router(manager_router)
 app.include_router(upload_logs_router)
 app.include_router(admin_system_router)
+app.include_router(admin_router)
 
 
 @app.get("/")

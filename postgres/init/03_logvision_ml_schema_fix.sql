@@ -47,3 +47,50 @@ CREATE TABLE IF NOT EXISTS etl_watermark (
   last_source_doc_id TEXT NOT NULL DEFAULT '',
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+<<<<<<< HEAD
+=======
+
+CREATE TABLE IF NOT EXISTS ml_sequence_score (
+  id BIGSERIAL PRIMARY KEY,
+  sequence_uid VARCHAR(128) NOT NULL,
+  application_key VARCHAR(100) NOT NULL,
+  component_name VARCHAR(150) NOT NULL,
+  start_timestamp TIMESTAMPTZ,
+  end_timestamp TIMESTAMPTZ,
+  event_ids TEXT NOT NULL,
+  iforest_baseline_score NUMERIC(10,6) DEFAULT 0,
+  knn_baseline_score NUMERIC(10,6) DEFAULT 0,
+  logbert_like_score NUMERIC(10,6) NOT NULL,
+  logbert_like_label VARCHAR(32),
+  final_anomaly_score NUMERIC(10,6) NOT NULL,
+  final_anomaly_label VARCHAR(32) NOT NULL,
+  model_name VARCHAR(120) NOT NULL,
+  model_version VARCHAR(60) NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(sequence_uid, model_name, model_version)
+);
+
+CREATE INDEX IF NOT EXISTS idx_ml_sequence_score_model
+ON ml_sequence_score(model_name, model_version);
+
+CREATE INDEX IF NOT EXISTS idx_ml_sequence_score_label
+ON ml_sequence_score(model_name, model_version, final_anomaly_label);
+
+CREATE INDEX IF NOT EXISTS idx_ml_sequence_score_app_component
+ON ml_sequence_score(application_key, component_name);
+
+CREATE TABLE IF NOT EXISTS ml_inference_score (
+  id BIGSERIAL PRIMARY KEY,
+  run_uid VARCHAR(128) NOT NULL,
+  sequence_index INTEGER NOT NULL,
+  anomaly_score NUMERIC(10,6) NOT NULL,
+  anomaly_label VARCHAR(32) NOT NULL,
+  model_name VARCHAR(120) NOT NULL,
+  model_version VARCHAR(60) NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(run_uid, sequence_index, model_name, model_version)
+);
+
+CREATE INDEX IF NOT EXISTS idx_ml_inference_score_model
+ON ml_inference_score(model_name, model_version);
+>>>>>>> 494bacd (Save workspace snapshot)

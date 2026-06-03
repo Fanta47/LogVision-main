@@ -24,7 +24,11 @@ export function VermegAnimatedLogo({ size = "md", className = "" }: VermegAnimat
           className="vermeg-logo-text font-bold tracking-tight inline-block whitespace-nowrap"
           style={{ fontSize: s.fontPx, lineHeight: 1 }}
         >
+<<<<<<< HEAD
           <span className="text-foreground">log</span>
+=======
+          <span className="text-foreground">Log</span>
+>>>>>>> 494bacd (Save workspace snapshot)
           <span style={{ color: VISION_RED }}>Vision</span>
         </span>
       </div>

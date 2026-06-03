@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 ﻿"use client";
 
 import { useEffect, useMemo, useState } from "react";
@@ -254,10 +255,46 @@ export default function ModelsPage() {
     setLabelFilter("all");
     setApplicationFilter("all");
     setComponentFilter("all");
+=======
+"use client";
+
+import { useEffect, useState } from "react";
+import { Brain, Database, Play, Wrench } from "lucide-react";
+import { toast } from "sonner";
+import { getMLStatus, getModelComparison, runMLScoring } from "@/lib/api";
+import type { MlModelComparisonRow, MlModelStatus } from "@/types/ml";
+
+export default function ModelsPage() {
+  const [rows, setRows] = useState<MlModelComparisonRow[]>([]);
+  const [status, setStatus] = useState<MlModelStatus | null>(null);
+  const [running, setRunning] = useState(false);
+
+  async function refresh() {
+    getMLStatus().then((data) => setStatus(data as MlModelStatus)).catch(() => setStatus(null));
+    getModelComparison().then((data) => setRows(data as MlModelComparisonRow[])).catch(() => setRows([]));
+  }
+
+  useEffect(() => {
+    refresh();
+  }, []);
+
+  async function run() {
+    setRunning(true);
+    try {
+      const res = await runMLScoring();
+      toast.success(res.message || "ML scoring status refreshed");
+      refresh();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "ML scoring failed");
+    } finally {
+      setRunning(false);
+    }
+>>>>>>> 494bacd (Save workspace snapshot)
   }
 
   return (
     <div className="space-y-6">
+<<<<<<< HEAD
       <div>
         <p className="text-xs font-semibold uppercase tracking-[0.22em] text-red-400">
           Intelligence
@@ -549,3 +586,89 @@ export default function ModelsPage() {
     </div>
   );
 }
+=======
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Brain className="h-5 w-5 text-primary" />
+          <div>
+            <h1 className="text-xl font-bold">ML models</h1>
+            <p className="mt-1 text-sm text-muted-foreground">LogBERT v1 full runtime and PostgreSQL sequence scores.</p>
+          </div>
+        </div>
+        <button onClick={run} disabled={running} className="flex items-center rounded-lg bg-red-600 px-4 py-2 text-xs font-black uppercase tracking-widest text-white shadow-[0_0_20px_rgba(220,38,38,0.4)] transition-all hover:scale-105 disabled:opacity-50">
+          <Play className="mr-2 h-4 w-4" />
+          {running ? "Checking..." : "Run scoring"}
+        </button>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-3">
+        <div className="glass-card rounded-lg p-5">
+          <div className="flex items-center gap-2 text-primary">
+            <Database className="h-4 w-4" />
+            <span className="text-xs font-semibold uppercase tracking-wider">Active model</span>
+          </div>
+          <p className="mt-3 break-all text-sm font-semibold">{status?.model_name ?? "logbert_like_distilbert_iforest"}</p>
+          <p className="mt-1 text-xs text-muted-foreground">{status?.model_version ?? "logbert_v1_full"}</p>
+        </div>
+        <div className="glass-card rounded-lg p-5">
+          <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Score status</div>
+          <p className="mt-3 text-sm font-semibold">
+            {status?.score_status === "loaded" ? "Loaded" : "No scored sequences"}
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">{Number(status?.sequence_scores ?? 0).toLocaleString()} sequences</p>
+        </div>
+        <div className="glass-card rounded-lg p-5">
+          <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Runtime</div>
+          <p className="mt-3 break-all text-xs text-muted-foreground">{status?.artifact_path ?? "ml_service/logbert_v1_full_runtime"}</p>
+        </div>
+      </div>
+
+      <div className="glass-card animate-slide-up rounded-xl border border-border/80 p-6">
+        <div className="flex items-center gap-2 text-primary">
+          <Wrench className="h-4 w-4" />
+          <span className="text-sm font-semibold uppercase tracking-wider">Runtime integration</span>
+        </div>
+        <h2 className="mt-3 text-lg font-semibold">LogBERT v1 full</h2>
+        <p className="mt-2 text-sm text-muted-foreground">
+          The active LogVision anomaly model reads real normalized sequences and writes results to PostgreSQL. If this table is empty, ingest logs, run ETL, build sequences, and run ML scoring.
+        </p>
+      </div>
+
+      <div className="glass-card rounded-lg p-5">
+        <h2 className="mb-3 text-sm font-semibold">Model comparison</h2>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm">
+            <thead className="text-xs uppercase text-muted-foreground">
+              <tr>
+                <th className="py-2">Sequence</th>
+                <th>App</th>
+                <th>Component</th>
+                <th>IForest</th>
+                <th>KMeans</th>
+                <th>LogBERT</th>
+                <th>Final</th>
+                <th>Label</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={r.sequence_uid} className="border-t border-border">
+                  <td className="py-3 font-mono text-xs">{String(r.sequence_uid).slice(0, 16)}</td>
+                  <td>{r.application_key}</td>
+                  <td>{r.component_name}</td>
+                  <td>{Number(r.iforest_anomaly_score ?? 0).toFixed(3)}</td>
+                  <td>{Number(r.kmeans_anomaly_score ?? 0).toFixed(3)}</td>
+                  <td>{Number(r.logbert_like_score ?? 0).toFixed(3)}</td>
+                  <td>{Number(r.final_anomaly_score ?? 0).toFixed(3)}</td>
+                  <td>{r.final_anomaly_label}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {rows.length === 0 && <p className="py-8 text-center text-sm text-muted-foreground">No real scored sequences are available yet. Ingest logs through Logstash, run ETL, build sequences, then run ML scoring.</p>}
+        </div>
+      </div>
+    </div>
+  );
+}
+>>>>>>> 494bacd (Save workspace snapshot)

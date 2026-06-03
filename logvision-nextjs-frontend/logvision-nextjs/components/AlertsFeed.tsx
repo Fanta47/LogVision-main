@@ -1,9 +1,17 @@
 ﻿"use client";
 
+<<<<<<< HEAD
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { AlertTriangle, CheckCircle2, XCircle, Check } from "lucide-react";
 import { toast } from "sonner";
+=======
+import { useEffect, useState } from "react";
+import { cn } from "@/lib/utils";
+import { AlertTriangle, CheckCircle2, XCircle, Check } from "lucide-react";
+import { toast } from "sonner";
+import { getManagerAlerts } from "@/lib/api";
+>>>>>>> 494bacd (Save workspace snapshot)
 
 interface Alert {
   id: string;
@@ -15,6 +23,7 @@ interface Alert {
   acknowledged: boolean;
 }
 
+<<<<<<< HEAD
 const initialAlerts: Alert[] = [
   { id: "1", severity: "critical", type: "Crash Prediction", app: "payment-svc", message: "Crash probability at 92% — memory leak pattern detected", timestamp: "2 min ago", acknowledged: false },
   { id: "2", severity: "critical", type: "Anomaly Detected", app: "risk-engine", message: "GPU utilization anomaly on node gpu-03 — inference failures rising", timestamp: "5 min ago", acknowledged: false },
@@ -26,6 +35,8 @@ const initialAlerts: Alert[] = [
   { id: "8", severity: "normal", type: "Deployment", app: "notification-svc", message: "v2.4.1 deployment completed successfully", timestamp: "1 hr ago", acknowledged: true },
 ];
 
+=======
+>>>>>>> 494bacd (Save workspace snapshot)
 const severityConfig = {
   critical: { bg: "border-l-critical", icon: XCircle, iconClass: "text-critical" },
   warning: { bg: "border-l-warning", icon: AlertTriangle, iconClass: "text-warning" },
@@ -33,7 +44,26 @@ const severityConfig = {
 };
 
 export function AlertsFeed() {
+<<<<<<< HEAD
   const [alerts, setAlerts] = useState<Alert[]>(initialAlerts);
+=======
+  const [alerts, setAlerts] = useState<Alert[]>([]);
+
+  useEffect(() => {
+    getManagerAlerts({ limit: 50 }).then((res) => {
+      const rows = Array.isArray(res.data) ? res.data : [];
+      setAlerts(rows.map((row: any) => ({
+        id: String(row.id ?? row.sequence_uid ?? ""),
+        severity: row.severity ?? "warning",
+        type: row.title ?? "Anomaly",
+        app: row.application_key ?? row.component_name ?? "unknown",
+        message: row.title ?? "Real anomaly alert from backend",
+        timestamp: row.created_at ? new Date(row.created_at).toLocaleString() : "",
+        acknowledged: false,
+      })));
+    }).catch(() => setAlerts([]));
+  }, []);
+>>>>>>> 494bacd (Save workspace snapshot)
 
   const acknowledge = (a: Alert) => {
     setAlerts((rows) => rows.map((r) => (r.id === a.id ? { ...r, acknowledged: true } : r)));
@@ -42,6 +72,14 @@ export function AlertsFeed() {
 
   return (
     <div className="space-y-2">
+<<<<<<< HEAD
+=======
+      {alerts.length === 0 && (
+        <div className="glass-card rounded-lg p-4 text-sm text-muted-foreground">
+          No real alerts available yet. Ingest logs through Logstash to populate this feed.
+        </div>
+      )}
+>>>>>>> 494bacd (Save workspace snapshot)
       {alerts.map((alert) => {
         const config = severityConfig[alert.severity];
         const Icon = config.icon;

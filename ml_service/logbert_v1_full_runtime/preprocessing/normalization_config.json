@@ -1,0 +1,7 @@
+{
+  "input_column": "sequence_text",
+  "event_ids_column": "event_ids",
+  "lowercase": false,
+  "max_length": 64,
+  "tokenizer": "distilbert-base-uncased"
+}

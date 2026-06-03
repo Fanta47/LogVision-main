@@ -1,9 +1,17 @@
 {
   "compilerOptions": {
+<<<<<<< HEAD
+=======
+    "ignoreDeprecations": "5.0",
+>>>>>>> 494bacd (Save workspace snapshot)
     "target": "ES2017",
     "lib": ["dom", "dom.iterable", "esnext"],
     "allowJs": true,
     "skipLibCheck": true,
+<<<<<<< HEAD
+=======
+    "forceConsistentCasingInFileNames": true,
+>>>>>>> 494bacd (Save workspace snapshot)
     "strict": true,
     "noEmit": true,
     "esModuleInterop": true,

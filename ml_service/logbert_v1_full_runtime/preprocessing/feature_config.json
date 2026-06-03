@@ -1,0 +1,18 @@
+{
+  "features": [
+    "event_count",
+    "token_count",
+    "unique_token_count",
+    "error_count",
+    "warning_count",
+    "sla_not_found_count",
+    "sla_found_count",
+    "sql_count",
+    "lifecycle_count",
+    "persistence_count",
+    "generic_info_count",
+    "risk_signal"
+  ],
+  "requires_exact_training_feature_order": true,
+  "production_rule": "Production inference must create DistilBERT embeddings, build numeric features in this exact order, concatenate them, apply scaler.transform, then score with IsolationForest."
+}

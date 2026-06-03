@@ -1,5 +1,6 @@
 ﻿"use client";
 
+<<<<<<< HEAD
 import { useEffect, useMemo, useState } from "react";
 import {
   Search,
@@ -293,3 +294,173 @@ export default function AnomaliesPage() {
     </div>
   );
 }
+=======
+import React, { useEffect, useState, useMemo, useCallback, Fragment } from "react";
+import Link from "next/link";
+import { getManagerAnomalies, downloadReport, getProfile } from "@/lib/api";
+import { BrainCircuit, FileDown, Database, TrendingUp, Brain, Zap } from "lucide-react";
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+
+export default function AnomaliesManagementPage() {
+  const [data, setData] = useState<any>({ items: [], score_status: "loading" });
+  const [loading, setLoading] = useState(true);
+  const [role, setRole] = useState("Analyst");
+  const [filters, setFilters] = useState({
+    application_key: "all",
+    component_name: "all",
+    start_date: "",
+    end_date: ""
+  });
+
+  const loadAnomalies = async (f = filters) => {
+    setLoading(true);
+    const res = await getManagerAnomalies({ 
+      model: "logbert_like_distilbert_iforest",
+      ...f
+    });
+    if (res.data) setData(res.data);
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    getProfile().then(r => setRole(r.data?.role || "Analyst"));
+    loadAnomalies();
+  }, []);
+
+  const chartData = useMemo(() => {
+    return (data.items || []).slice(0, 20).reverse().map((item: any) => ({
+      time: new Date(item.start_timestamp || item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      score: Math.round((item.final_anomaly_score || 0) * 100)
+    }));
+  }, [data.items]);
+
+  if (data.score_status === "waiting_for_postgres_scores") {
+    return (
+      <div className="flex flex-col items-center justify-center p-20 text-center space-y-4">
+        <div className="rounded-full bg-amber-500/10 p-6 border border-amber-500/20">
+          <Database className="h-12 w-12 text-amber-500" />
+        </div>
+        <h2 className="text-xl font-bold text-white">No Real Scores Available</h2>
+        <p className="max-w-md text-sm text-muted-foreground">
+          No real anomaly scores are available yet. Ingest logs through Logstash, run ETL, build PostgreSQL sequences, and score them with the ML service.
+        </p>
+        <button onClick={() => loadAnomalies()} className="rounded-lg bg-amber-500 px-6 py-2 text-xs font-black uppercase text-[#05080d]">Refresh Status</button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6 pb-20 animate-in fade-in duration-500">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <BrainCircuit className="h-6 w-6 text-amber-500" />
+          <div>
+            <h1 className="text-xl font-bold text-white">
+              {role === "Analyst" ? "Anomaly Analysis" : "Anomalies Explorer"}
+            </h1>
+            <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Real ML sequence scores from PostgreSQL</p>
+          </div>
+        </div>
+        <button 
+          onClick={() => downloadReport('anomalies')} title="Download Report"
+          className="flex items-center gap-2 rounded-lg bg-amber-500 px-4 py-2 text-xs font-black uppercase tracking-widest text-[#05080d] shadow-lg"
+        >
+          <FileDown className="h-4 w-4" /> Export ML Data
+        </button>
+      </div>
+
+      {/* Evolution Chart */}
+      <div className="glass-card rounded-2xl border border-white/5 p-6 h-[250px] w-full bg-amber-500/5">
+        <div className="mb-4 flex items-center gap-2">
+          <TrendingUp className="h-4 w-4 text-amber-500" />
+          <h3 className="text-xs font-black uppercase tracking-widest text-muted-foreground">Évolution du score d'anomalie (Séquences récentes)</h3>
+        </div>
+        <ResponsiveContainer width="100%" height="100%">
+          <AreaChart data={chartData}>
+            <defs>
+              <linearGradient id="colorScore" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.3}/>
+                <stop offset="95%" stopColor="#f59e0b" stopOpacity={0}/>
+              </linearGradient>
+            </defs>
+            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.05)" />
+            <XAxis dataKey="time" axisLine={false} tickLine={false} tick={{ fill: "#64748b", fontSize: 10 }} dy={10} />
+            <YAxis axisLine={false} tickLine={false} tick={{ fill: "#64748b", fontSize: 10 }} domain={[0, 100]} />
+            <Tooltip contentStyle={{ backgroundColor: "rgba(11, 18, 32, 0.9)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "12px", backdropFilter: "blur(8px)" }} />
+            <Area type="monotone" dataKey="score" stroke="#f59e0b" strokeWidth={3} fillOpacity={1} fill="url(#colorScore)" animationDuration={1000} />
+          </AreaChart>
+        </ResponsiveContainer>
+      </div>
+
+      {/* Filter Bar */}
+      <div className="glass-card flex flex-wrap items-center gap-3 rounded-xl border border-white/5 p-4">
+        <input 
+          type="text" title="Filtrer par application"
+          placeholder="Application..." 
+          className="rounded-lg border border-border bg-background/50 px-3 py-2 text-xs outline-none focus:ring-1 focus:ring-amber-500 text-white min-w-[150px]"
+          value={filters.application_key === "all" ? "" : filters.application_key}
+          onChange={(e) => setFilters({...filters, application_key: e.target.value || "all"})}
+        />
+        <input 
+          type="date" title="Date de début"
+          className="rounded-lg border border-border bg-background/50 px-3 py-2 text-xs outline-none text-slate-300"
+          value={filters.start_date}
+          onChange={(e) => setFilters({...filters, start_date: e.target.value})}
+        />
+        <button onClick={() => loadAnomalies()} className="rounded-lg bg-white/5 border border-white/10 px-4 py-2 text-xs font-bold text-white hover:bg-white/10 transition-all">
+          Apply Filters
+        </button>
+      </div>
+
+      <div className="glass-card rounded-xl border border-white/5 overflow-hidden">
+        <table className="w-full text-sm">
+          <thead className="bg-white/5 text-[10px] font-black uppercase tracking-widest text-muted-foreground text-left">
+            <tr>
+              <th className="p-4">Sequence UID</th>
+              <th className="p-4">Severity Score</th>
+              <th className="p-4">Context</th>
+              <th className="p-4 text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-white/5">
+            {data.items.map((item: any) => (
+              <Fragment key={item.sequence_uid}>
+                <tr className="hover:bg-white/5 transition-colors group">
+                  <td className="p-4 font-mono text-xs text-blue-400"><Zap className={`inline h-3 w-3 mr-2 ${role === 'Analyst' ? 'text-cyan-400' : 'text-amber-500'}`} />{item.sequence_uid.split('-')[0]}...</td>
+                  <td className="p-4">
+                    <div className="flex items-center gap-3">
+                      <div className={`rounded-full px-2 py-0.5 text-[10px] font-black uppercase ${item.final_anomaly_score > 0.8 ? 'bg-red-500/20 text-red-500' : 'bg-cyan-500/20 text-cyan-400'}`}>
+                        {item.final_anomaly_score > 0.8 ? 'Critical' : 'Warning'}
+                      </div>
+                      <span className="font-mono text-[10px] font-bold">{(item.final_anomaly_score * 100).toFixed(1)}%</span>
+                    </div>
+                  </td>
+                  <td className="p-4 font-bold text-slate-300 text-xs">{item.application_key}</td>
+                  <td className="p-4 text-right">
+                    <Link href={`/dashboard/logs?sequence_uid=${item.sequence_uid}`} className="text-cyan-400 hover:underline text-[10px] font-black uppercase tracking-widest">Investigate</Link>
+                  </td>
+                </tr>
+                {role === "Analyst" && (
+                  <tr className="bg-cyan-500/5">
+                    <td colSpan={4} className="p-4 pt-0">
+                      <div className="rounded-lg bg-black/20 p-3 flex items-start gap-3 border border-cyan-500/10">
+                        <Brain className="h-4 w-4 text-cyan-500 mt-0.5 shrink-0" />
+                        <div className="space-y-1">
+                          <span className="text-[10px] font-black uppercase tracking-tighter text-cyan-500">Evidence</span>
+                          <p className="text-xs text-slate-400 leading-relaxed">
+                            Real ML score {Number(item.final_anomaly_score ?? 0).toFixed(4)} for {item.application_key}/{item.component_name}. Open the related logs to investigate the source events.
+                          </p>
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </Fragment>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+>>>>>>> 494bacd (Save workspace snapshot)

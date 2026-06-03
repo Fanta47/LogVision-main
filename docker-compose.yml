@@ -78,6 +78,20 @@ services:
       retries: 120
     restart: on-failure
 
+<<<<<<< HEAD
+=======
+  keycloak:
+    image: quay.io/keycloak/keycloak:latest
+    container_name: logvision-keycloak
+    command: start-dev
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+    ports:
+      - "8081:8080"
+    restart: unless-stopped
+
+>>>>>>> 494bacd (Save workspace snapshot)
   es01:
     depends_on:
       setup:
@@ -96,20 +110,30 @@ services:
       - discovery.type=single-node
       - ELASTIC_PASSWORD=${ELASTIC_PASSWORD}
       - bootstrap.memory_lock=true
+<<<<<<< HEAD
 
       - xpack.security.enabled=true
 
+=======
+      - xpack.security.enabled=true
+>>>>>>> 494bacd (Save workspace snapshot)
       - xpack.security.http.ssl.enabled=true
       - xpack.security.http.ssl.key=certs/es01/es01.key
       - xpack.security.http.ssl.certificate=certs/es01/es01.crt
       - xpack.security.http.ssl.certificate_authorities=certs/ca/ca.crt
+<<<<<<< HEAD
 
+=======
+>>>>>>> 494bacd (Save workspace snapshot)
       - xpack.security.transport.ssl.enabled=true
       - xpack.security.transport.ssl.key=certs/es01/es01.key
       - xpack.security.transport.ssl.certificate=certs/es01/es01.crt
       - xpack.security.transport.ssl.certificate_authorities=certs/ca/ca.crt
       - xpack.security.transport.ssl.verification_mode=certificate
+<<<<<<< HEAD
 
+=======
+>>>>>>> 494bacd (Save workspace snapshot)
       - xpack.license.self_generated.type=${LICENSE}
       - ES_JAVA_OPTS=-Xms512m -Xmx512m
     mem_limit: ${ES_MEM_LIMIT}
@@ -119,11 +143,15 @@ services:
         soft: -1
         hard: -1
     healthcheck:
+<<<<<<< HEAD
       test:
         [
           "CMD-SHELL",
           "curl -s --cacert config/certs/ca/ca.crt https://localhost:9200 | grep -q 'missing authentication credentials'"
         ]
+=======
+      test: ["CMD-SHELL", "curl -s --cacert config/certs/ca/ca.crt https://localhost:9200 | grep -q 'missing authentication credentials'"]
+>>>>>>> 494bacd (Save workspace snapshot)
       interval: 10s
       timeout: 10s
       retries: 120
@@ -172,11 +200,15 @@ services:
     mem_limit: ${KB_MEM_LIMIT}
     cpus: 1.0
     healthcheck:
+<<<<<<< HEAD
       test:
         [
           "CMD-SHELL",
           "curl -s -I http://localhost:5601 | grep -q 'HTTP/1.1 302 Found'"
         ]
+=======
+      test: ["CMD-SHELL", "curl -s -I http://localhost:5601 | grep -q 'HTTP/1.1 302 Found'"]
+>>>>>>> 494bacd (Save workspace snapshot)
       interval: 10s
       timeout: 10s
       retries: 120
@@ -222,6 +254,13 @@ services:
       - ES_USERNAME=elastic
       - ES_PASSWORD=${ELASTIC_PASSWORD}
       - ES_CA_CERT=/certs/ca/ca.crt
+<<<<<<< HEAD
+=======
+      - ML_MODEL_NAME=logbert_like_distilbert_iforest
+      - ML_MODEL_VERSION=logbert_v1_full
+      - ML_MODEL_ARTIFACT_PATH=ml_service/logbert_v1_full_runtime
+      - ML_SCORES_CSV_PATH=ml_service/logbert_v1_full_runtime/outputs/logbert_v1_full_scores.csv
+>>>>>>> 494bacd (Save workspace snapshot)
       - PG_DSN=postgresql://logs_user:logs_pass@postgres:5432/logs
       - POLL_SECONDS=5
       - BATCH_SIZE=1000
@@ -236,9 +275,45 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+<<<<<<< HEAD
   backend:
     build: ./backend
     environment:
+=======
+  ml_score_exporter:
+    build:
+      context: ./ml_service
+      dockerfile: Dockerfile.exporter
+    environment:
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=logs
+      - POSTGRES_USER=logs_user
+      - POSTGRES_PASSWORD=logs_pass
+      - ES_URLS=https://es01:9200
+      - ES_USERNAME=elastic
+      - ES_PASSWORD=${ELASTIC_PASSWORD}
+      - ES_CA_CERT=/certs/ca/ca.crt
+      - ES_ML_INDEX=logvision-ml-scores
+      - LOGBERT_MODEL_NAME=logbert_like_distilbert_iforest
+      - LOGBERT_MODEL_VERSION=logbert_v1_full
+      - EXPORT_BATCH_SIZE=1000
+      - EXPORT_POLL_SECONDS=900
+      - EXPORT_ONCE=false
+    volumes:
+      - certs:/certs:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      es01:
+        condition: service_healthy
+    restart: unless-stopped
+
+  backend:
+    build: ./backend
+    environment:
+      - DEV_ALLOW_ALL_ORIGINS=1
+>>>>>>> 494bacd (Save workspace snapshot)
       - DATABASE_URL=postgresql://logs_user:logs_pass@postgres:5432/logs
       - ES_URLS=https://es01:9200
       - ES_USERNAME=elastic
@@ -246,6 +321,10 @@ services:
       - ES_CA_CERT=/certs/ca/ca.crt
     volumes:
       - certs:/certs:ro
+<<<<<<< HEAD
+=======
+      - /var/run/docker.sock:/var/run/docker.sock
+>>>>>>> 494bacd (Save workspace snapshot)
     depends_on:
       postgres:
         condition: service_healthy
@@ -254,3 +333,26 @@ services:
     ports:
       - "8000:8000"
     restart: unless-stopped
+<<<<<<< HEAD
+=======
+
+  ml_runtime:
+    image: python:3.11-slim
+    container_name: logvision-ml-runtime
+    working_dir: /app/runtime
+    volumes:
+      - ./ml_service/logbert_v1_full_runtime:/app/runtime:ro
+    ports:
+      - "8001:8000"
+    environment:
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=logs
+      - POSTGRES_USER=logs_user
+      - POSTGRES_PASSWORD=logs_pass
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: bash -c "pip install --no-cache-dir numpy pandas scikit-learn joblib fastapi uvicorn pydantic psycopg2-binary && python server.py"
+    restart: unless-stopped
+>>>>>>> 494bacd (Save workspace snapshot)

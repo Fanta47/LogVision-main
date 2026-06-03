@@ -58,3 +58,21 @@ Any password works in this frontend-only demo. Replace `lib/auth.ts` with Keyclo
 - Kibana is embedded via `NEXT_PUBLIC_KIBANA_DASHBOARD_URL`.
 - API calls are centralized in `lib/api.ts`.
 - The frontend intentionally does not use Supabase tables for logs or anomalies.
+<<<<<<< HEAD
+=======
+
+## Authentication modes
+- Demo: NEXT_PUBLIC_AUTH_MODE=demo
+- Keycloak: NEXT_PUBLIC_AUTH_MODE=keycloak with NEXT_PUBLIC_KEYCLOAK_URL, NEXT_PUBLIC_KEYCLOAK_REALM, NEXT_PUBLIC_KEYCLOAK_CLIENT_ID
+- Demo accounts: admin@vermeg.com, manager@vermeg.com, user@vermeg.com (any password)
+
+## Forgot password flow
+- User sends request from /forgot-password
+- Admin reviews on /dashboard/admin/password-requests
+- Future TODO: backend Keycloak Admin API execute-actions-email UPDATE_PASSWORD
+
+## Routes
+- Admin: /dashboard/admin/system, /dashboard/admin/users, /dashboard/admin/roles, /dashboard/admin/alert-rules, /dashboard/admin/password-requests, /dashboard/admin/configuration
+- Manager: /dashboard/manager
+- User: /dashboard, /dashboard/logs, /dashboard/alerts, /dashboard/anomalies, /dashboard/incidents, /dashboard/ingest, /dashboard/reports, /dashboard/profile
+>>>>>>> 494bacd (Save workspace snapshot)

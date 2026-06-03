@@ -1,0 +1,27 @@
+{
+  "strategy": "per_application",
+  "score_column": "logbert_like_score",
+  "score_direction": "higher_is_more_anomalous",
+  "global": {
+    "threshold_suspicious": 0.8234796980767378,
+    "threshold_anomalous": 0.9709142211134746
+  },
+  "per_application": {
+    "megacash": {
+      "threshold_suspicious": 0.9020016217886369,
+      "threshold_anomalous": 0.9755586106880924
+    },
+    "megacommon": {
+      "threshold_suspicious": 0.7618091632446026,
+      "threshold_anomalous": 0.8676660818073273
+    },
+    "megacore": {
+      "threshold_suspicious": 0.6450637005004448,
+      "threshold_anomalous": 0.8543680812452628
+    },
+    "megacustody": {
+      "threshold_suspicious": 0.8601099496075866,
+      "threshold_anomalous": 0.9450642538666479
+    }
+  }
+}

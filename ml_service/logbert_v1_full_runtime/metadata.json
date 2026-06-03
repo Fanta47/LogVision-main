@@ -1,0 +1,28 @@
+{
+  "platform": "LogVision",
+  "model_name": "LogBERT-like DistilBERT IsolationForest",
+  "model_version": "logbert_v1_full",
+  "trained_on": "Kaggle",
+  "training_rows_scored": 1176763,
+  "iforest_train_rows": 200000,
+  "runtime_target": "ml_service",
+  "output_table": "ml_sequence_score",
+  "artifact_type": "joblib_dict",
+  "threshold_strategy": "per_application",
+  "production_mapping": {
+    "sequence_uid": "ml_sequence.sequence_key",
+    "logbert_like_score": "ml_sequence_score.anomaly_score",
+    "logbert_like_label": "ml_sequence_score.label",
+    "iforest_raw": "ml_sequence_score.scoring_metadata.iforest_raw"
+  },
+  "required_files": [
+    "model/logbert_like_iforest_v2.joblib",
+    "model/threshold.json",
+    "model/model_config.json",
+    "preprocessing/normalization_config.json",
+    "preprocessing/feature_config.json",
+    "base_model/distilbert-base-uncased/config.json",
+    "base_model/distilbert-base-uncased/vocab.txt",
+    "base_model/distilbert-base-uncased/model.safetensors or pytorch_model.bin"
+  ]
+}

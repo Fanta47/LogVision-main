@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import type { Metadata } from "next";
 import "./globals.css";
 import { Toaster } from "sonner";
@@ -17,3 +18,26 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     </html>
   );
 }
+=======
+import './globals.css'; // Assurez-vous que ce chemin est correct pour vos styles globaux
+
+export const metadata = {
+  title: 'LogVision',
+  description: 'Plateforme d\'analyse de logs en temps réel avec intelligence prédictive',
+  icons: {
+    icon: '/assets/vermeg-slash.png', // Utilise l'image existante du slash rouge comme favicon
+  },
+};
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <html lang="fr">
+      <body>{children}</body>
+    </html>
+  );
+}
+>>>>>>> 494bacd (Save workspace snapshot)

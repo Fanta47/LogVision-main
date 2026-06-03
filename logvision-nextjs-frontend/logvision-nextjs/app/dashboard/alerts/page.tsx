@@ -1,5 +1,6 @@
 "use client";
 
+<<<<<<< HEAD
 import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, ShieldAlert, Activity, Clock3 } from "lucide-react";
 import { apiGet } from "@/lib/api";
@@ -274,6 +275,159 @@ export default function AlertsPage() {
           </div>
         </>
       )}
+=======
+import { useEffect, useState, useMemo } from "react";
+import { getManagerAlerts, updateAlertStatus, createIncidentFromAlert, downloadReport } from "@/lib/api";
+import { AlertTriangle, Bell, Filter, CheckCircle2, Zap, Search, FileDown, Clock, Layers } from "lucide-react";
+import { toast } from "sonner";
+
+export default function ManagerAlertsPage() {
+  const [alerts, setAlerts] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [filters, setFilters] = useState({
+    severity: "all",
+    status: "open",
+    application: "all"
+  });
+  const [searchTerm, setSearchTerm] = useState("");
+
+  const fetchAlerts = async () => {
+    setLoading(true);
+    const res = await getManagerAlerts(filters);
+    if (res.data) setAlerts(res.data);
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    fetchAlerts();
+  }, [filters]);
+
+  const filteredAlerts = useMemo(() => {
+    return alerts.filter(a => 
+      a.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      a.application_key.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [alerts, searchTerm]);
+
+  const handleAcknowledge = async (id: string) => {
+    const res = await updateAlertStatus(id, "acknowledged");
+    if (!res.error) {
+      toast.success("Alert acknowledged");
+      setAlerts(prev => prev.map(a => a.id === id ? { ...a, status: "acknowledged" } : a));
+    }
+  };
+
+  const handleCreateIncident = async (alertId: string) => {
+    const res = await createIncidentFromAlert(alertId);
+    if (!res.error) {
+      toast.success("Incident created successfully");
+      setAlerts(prev => prev.map(a => a.id === alertId ? { ...a, status: "incident_created" } : a));
+    }
+  };
+
+  return (
+    <div className="space-y-6 pb-20">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Bell className="h-6 w-6 text-amber-500" />
+          <div>
+            <h1 className="text-xl font-bold text-white">Alert Center</h1>
+            <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Real-time threat & anomaly feed</p>
+          </div>
+        </div>
+        <button 
+          onClick={() => downloadReport('alerts')}
+          className="flex items-center gap-2 rounded-lg bg-amber-500 px-4 py-2 text-xs font-black uppercase tracking-widest text-[#05080d] shadow-lg hover:scale-105 transition-all"
+        >
+          <FileDown className="h-4 w-4" /> Export Alerts
+        </button>
+      </div>
+
+      {/* Filters Bar */}
+      <div className="glass-card flex flex-wrap items-center gap-4 rounded-xl border border-white/5 p-4">
+        <div className="relative flex-1 min-w-[200px]">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <input
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Search alerts..."
+            className="w-full rounded-lg border border-border bg-background/50 px-3 py-2 pl-10 text-sm outline-none focus:ring-1 focus:ring-amber-500 text-white"
+          />
+        </div>
+        <select 
+          value={filters.severity} title="Severity Level"
+          onChange={(e) => setFilters({...filters, severity: e.target.value})}
+          className="rounded-lg border border-border bg-secondary/50 px-3 py-2 text-xs font-bold uppercase outline-none text-slate-300"
+        >
+          <option value="all">All Severities</option>
+          <option value="critical">Critical</option>
+          <option value="warning">Warning</option>
+          <option value="info">Info</option>
+        </select>
+        <select 
+          value={filters.status} title="Alert Status"
+          onChange={(e) => setFilters({...filters, status: e.target.value})}
+          className="rounded-lg border border-border bg-secondary/50 px-3 py-2 text-xs font-bold uppercase outline-none text-slate-300"
+        >
+          <option value="all">All Statuses</option>
+          <option value="open">Open</option>
+          <option value="acknowledged">Acknowledged</option>
+          <option value="resolved">Resolved</option>
+        </select>
+      </div>
+
+      <div className="glass-card rounded-xl border border-white/5 overflow-hidden">
+        <table className="w-full text-sm">
+          <thead className="bg-white/5 text-[10px] font-black uppercase tracking-widest text-muted-foreground text-left">
+            <tr>
+              <th className="p-4">Alert</th>
+              <th className="p-4">Severity</th>
+              <th className="p-4">Application / Service</th>
+              <th className="p-4"><Clock className="h-3 w-3 inline mr-1" /> Detected</th>
+              <th className="p-4 text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-white/5">
+            {loading ? (
+              <tr><td colSpan={5} className="p-12 text-center text-muted-foreground animate-pulse">Syncing with alert engine...</td></tr>
+            ) : filteredAlerts.length === 0 ? (
+              <tr><td colSpan={5} className="p-12 text-center text-muted-foreground">No alerts found.</td></tr>
+            ) : (
+              filteredAlerts.map((alert) => (
+                <tr key={alert.id} className="hover:bg-white/5 transition-colors group">
+                  <td className="p-4">
+                    <div className="flex flex-col">
+                      <span className="font-bold text-slate-200">{alert.title}</span>
+                      <span className="text-[10px] text-muted-foreground font-mono">ID: {alert.id.split('-')[0]}</span>
+                    </div>
+                  </td>
+                  <td className="p-4">
+                    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[9px] font-black uppercase ${alert.severity === 'critical' ? 'bg-red-500/20 text-red-500' : alert.severity === 'warning' ? 'bg-amber-500/20 text-amber-500' : 'bg-blue-500/20 text-blue-500'}`}>
+                      {alert.severity}
+                    </span>
+                  </td>
+                  <td className="p-4">
+                    <div className="flex flex-col">
+                      <span className="text-xs font-bold text-slate-400">{alert.application_key}</span>
+                      <span className="text-[9px] uppercase tracking-tighter text-muted-foreground">{alert.component_name}</span>
+                    </div>
+                  </td>
+                  <td className="p-4 text-xs font-mono text-muted-foreground">
+                    {new Date(alert.created_at).toLocaleString()}
+                  </td>
+                  <td className="p-4 text-right">
+                    <div className="flex justify-end gap-2">
+                      <button onClick={() => handleAcknowledge(alert.id)} disabled={alert.status !== 'open'} className="p-2 rounded-lg bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500 hover:text-white transition-all disabled:opacity-20"><CheckCircle2 className="h-4 w-4" /></button>
+                      <button onClick={() => handleCreateIncident(alert.id)} disabled={alert.status === 'incident_created'} className="p-2 rounded-lg bg-amber-500/10 text-amber-500 hover:bg-amber-500 hover:text-[#05080d] transition-all disabled:opacity-20"><Zap className="h-4 w-4" /></button>
+                    </div>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+>>>>>>> 494bacd (Save workspace snapshot)
     </div>
   );
 }

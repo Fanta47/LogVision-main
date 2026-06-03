@@ -9,12 +9,26 @@
     "lint": "next lint"
   },
   "dependencies": {
+<<<<<<< HEAD
     "@types/node": "latest",
     "@types/react": "latest",
     "@types/react-dom": "latest",
     "clsx": "^2.1.1",
     "lucide-react": "^0.468.0",
     "next": "^14.2.0",
+=======
+    "@types/bcryptjs": "^2.4.6",
+    "@types/node": "latest",
+    "@types/pg": "^8.11.6",
+    "@types/react": "latest",
+    "@types/react-dom": "latest",
+    "bcryptjs": "^2.4.3",
+    "clsx": "^2.1.1",
+    "keycloak-js": "^26.2.4",
+    "lucide-react": "^0.468.0",
+    "next": "^14.2.0",
+    "pg": "^8.12.0",
+>>>>>>> 494bacd (Save workspace snapshot)
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "recharts": "^2.12.7",

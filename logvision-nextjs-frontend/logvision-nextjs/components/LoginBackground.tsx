@@ -6,12 +6,24 @@ export function LoginBackground() {
       <div className="aurora aurora-3" />
       <div className="login-grid" />
       <div className="login-sweep" />
+<<<<<<< HEAD
+=======
+
+>>>>>>> 494bacd (Save workspace snapshot)
       <div className="particles">
         {Array.from({ length: 24 }).map((_, i) => (
           <span key={i} className={`particle p-${i % 8}`} />
         ))}
       </div>
+<<<<<<< HEAD
       <div className="login-vignette" />
     </div>
   );
 }
+=======
+
+      <div className="login-vignette" />
+    </div>
+  );
+}
+>>>>>>> 494bacd (Save workspace snapshot)

@@ -1,5 +1,6 @@
 "use client";
 
+<<<<<<< HEAD
 import { useEffect, useMemo, useState } from "react";
 import {
   Upload,
@@ -349,3 +350,157 @@ export default function IngestionPage() {
     </div>
   );
 }
+=======
+import { useState } from "react";
+import { Upload, FileCheck2, FileX2, Loader2, Database, Terminal } from "lucide-react";
+import { toast } from "sonner";
+import { uploadLogFile } from "@/lib/api";
+
+const TARGETS = [
+  { application_key: "MegaCash", component_name: "Persistence", desc: "MegaCash persistence logs" },
+  { application_key: "MegaCash", component_name: "MegaCashSLALogger", desc: "MegaCash SLA logs" },
+  { application_key: "MegaCor", component_name: "Persistence", desc: "MegaCor persistence logs" },
+  { application_key: "MegaCor", component_name: "BasicStruct", desc: "MegaCor BasicStruct logs" },
+  { application_key: "MegaCommon", component_name: "Persistence", desc: "MegaCommon persistence logs" },
+  { application_key: "MegaCustody", component_name: "LifeCycleLog", desc: "MegaCustody lifecycle logs" },
+];
+
+export default function LogIngestionPage() {
+  const [selectedTarget, setSelectedTarget] = useState(TARGETS[0]);
+  const [file, setFile] = useState<File | null>(null);
+  const [ingesting, setIngesting] = useState(false);
+
+  const handleUpload = async () => {
+    if (!file) return;
+
+    setIngesting(true);
+    const tid = toast.loading("Uploading log file to backend...");
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("application_key", selectedTarget.application_key);
+      formData.append("component_name", selectedTarget.component_name);
+
+      const res = await uploadLogFile(formData);
+      if (res.error) throw new Error(res.error);
+
+      setIngesting(false);
+      setFile(null);
+      toast.success(`Uploaded ${res.data?.stored_file_name ?? file.name}`, { id: tid });
+    } catch (err) {
+      setIngesting(false);
+      toast.error(err instanceof Error ? err.message : "Upload failed", { id: tid });
+    }
+  };
+
+  return (
+    <div className="space-y-6 pb-20 animate-in slide-in-from-bottom-4 duration-500">
+      <div>
+        <h1 className="text-2xl font-black text-white">Log Ingestion</h1>
+        <p className="text-xs text-muted-foreground">Upload log files per application for parsing, validation, and AI analysis</p>
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-3">
+        <div className="lg:col-span-2 space-y-6">
+          {/* Étape 1: Application Selection */}
+          <div className="glass-card rounded-2xl border border-white/5 p-6">
+            <h3 className="text-[10px] font-black uppercase tracking-widest text-cyan-500 mb-4 flex items-center gap-2">
+              <Database className="h-3 w-3" /> Step 1: Target Application
+            </h3>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {TARGETS.map((target) => {
+                const id = `${target.application_key}/${target.component_name}`;
+                const active = selectedTarget.application_key === target.application_key && selectedTarget.component_name === target.component_name;
+                return (
+                <button
+                  key={id}
+                  onClick={() => setSelectedTarget(target)}
+                  className={`flex flex-col gap-1 p-4 rounded-xl border text-left transition-all ${
+                    active
+                      ? "bg-cyan-500/10 border-cyan-500 shadow-[0_0_15px_rgba(6,182,212,0.2)]" 
+                      : "bg-white/5 border-white/5 hover:border-white/10"
+                  }`}
+                >
+                  <span className={`font-mono text-xs font-bold ${active ? "text-cyan-400" : "text-slate-300"}`}>{id}</span>
+                  <span className="text-[10px] text-muted-foreground leading-tight">{target.desc}</span>
+                </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Étape 2: Drop Zone */}
+          <div className="glass-card rounded-2xl border border-white/5 p-6">
+            <h3 className="text-[10px] font-black uppercase tracking-widest text-cyan-500 mb-4 flex items-center gap-2">
+              <Upload className="h-3 w-3" /> Step 2: Upload Source
+            </h3>
+            <label className="relative flex flex-col items-center justify-center border-2 border-dashed border-white/10 rounded-2xl p-10 hover:bg-cyan-500/5 hover:border-cyan-500/40 cursor-pointer transition-all">
+              <input 
+                type="file" 
+                className="hidden" 
+                onChange={(e) => setFile(e.target.files?.[0] || null)}
+                accept=".log,.txt"
+              />
+              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-cyan-500/10 text-cyan-500 mb-4">
+                <Terminal className="h-8 w-8" />
+              </div>
+              <span className="text-sm font-bold text-slate-200">
+                {file ? `Ready: ${file.name}` : "Drop log file here, or click to browse"}
+              </span>
+              <span className="text-[10px] text-muted-foreground mt-1">Supports .log and .txt files accepted by the backend.</span>
+            </label>
+          </div>
+        </div>
+
+        {/* Sidebar Status & Action */}
+        <div className="space-y-6">
+          <div className="glass-card rounded-2xl border border-white/5 p-6 space-y-4">
+            <h3 className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Validation Preview</h3>
+            {file ? (
+              <div className="space-y-4">
+                <div className="flex items-center gap-3 text-emerald-500 bg-emerald-500/10 p-3 rounded-xl border border-emerald-500/20">
+                  <FileCheck2 className="h-5 w-5" />
+                  <span className="text-[10px] font-black uppercase">Format Validated</span>
+                </div>
+
+                {ingesting && (
+                  <div className="space-y-2 animate-in fade-in duration-300">
+                    <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-tighter">
+                      <span className="text-cyan-500 animate-pulse">Uploading to FastAPI...</span>
+                      <span className="text-muted-foreground">pending</span>
+                    </div>
+                    <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full w-1/2 animate-pulse bg-cyan-500 shadow-[0_0_12px_rgba(6,182,212,0.6)]" 
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <div className="bg-black/40 rounded-xl p-4 font-mono text-[10px] text-slate-400 overflow-hidden">
+                  <div className="text-cyan-500 mb-2">// Backend target</div>
+                  <div>application_key={selectedTarget.application_key}</div>
+                  <div>component_name={selectedTarget.component_name}</div>
+                </div>
+                <button
+                  onClick={handleUpload}
+                  disabled={ingesting}
+                  className="w-full rounded-xl bg-cyan-500 py-3 text-[10px] font-black uppercase tracking-widest text-[#05080d] shadow-lg shadow-cyan-900/40 hover:scale-105 transition-all"
+                >
+                  {ingesting ? <Loader2 className="mx-auto h-4 w-4 animate-spin" /> : "Start Ingestion"}
+                </button>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center h-40 border border-white/5 border-dashed rounded-xl">
+                <FileX2 className="h-8 w-8 text-muted-foreground/20" />
+                <span className="text-[10px] font-black uppercase text-muted-foreground/30 mt-2">Waiting for input</span>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+>>>>>>> 494bacd (Save workspace snapshot)

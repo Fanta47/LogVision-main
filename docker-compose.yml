@@ -315,6 +315,7 @@ services:
       - DEV_ALLOW_ALL_ORIGINS=1
 >>>>>>> 494bacd (Save workspace snapshot)
       - DATABASE_URL=postgresql://logs_user:logs_pass@postgres:5432/logs
+      - DOCKER_HOST=unix:///var/run/docker.sock
       - ES_URLS=https://es01:9200
       - ES_USERNAME=elastic
       - ES_PASSWORD=${ELASTIC_PASSWORD}

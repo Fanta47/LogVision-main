@@ -1,9 +1,13 @@
 {
   "compilerOptions": {
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
     "ignoreDeprecations": "5.0",
 >>>>>>> 494bacd (Save workspace snapshot)
+=======
+    "ignoreDeprecations": "6.0",
+>>>>>>> 22f3de9 (Initial LogVision commit)
     "target": "ES2017",
     "lib": ["dom", "dom.iterable", "esnext"],
     "allowJs": true,

@@ -9,6 +9,9 @@ COPY requirements.txt /app/requirements.txt
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r /app/requirements.txt
 
+# Install docker CLI so the container can run `docker ps` against the mounted socket
+RUN apt-get update && apt-get install -y docker.io && rm -rf /var/lib/apt/lists/*
+
 COPY app /app/app
 
 EXPOSE 8000

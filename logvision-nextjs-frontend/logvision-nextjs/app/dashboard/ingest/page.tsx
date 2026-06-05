@@ -1,6 +1,7 @@
 "use client";
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 import { useEffect, useMemo, useState } from "react";
 import {
   Upload,
@@ -353,43 +354,131 @@ export default function IngestionPage() {
 =======
 import { useState } from "react";
 import { Upload, FileCheck2, FileX2, Loader2, Database, Terminal } from "lucide-react";
+=======
+import { useState, useMemo } from "react";
+import { Upload, FileCheck2, FileX2, Loader2, Database, Terminal, Cpu, CheckCircle2 } from "lucide-react";
+>>>>>>> 22f3de9 (Initial LogVision commit)
 import { toast } from "sonner";
 import { uploadLogFile } from "@/lib/api";
 
-const TARGETS = [
-  { application_key: "MegaCash", component_name: "Persistence", desc: "MegaCash persistence logs" },
-  { application_key: "MegaCash", component_name: "MegaCashSLALogger", desc: "MegaCash SLA logs" },
-  { application_key: "MegaCor", component_name: "Persistence", desc: "MegaCor persistence logs" },
-  { application_key: "MegaCor", component_name: "BasicStruct", desc: "MegaCor BasicStruct logs" },
-  { application_key: "MegaCommon", component_name: "Persistence", desc: "MegaCommon persistence logs" },
-  { application_key: "MegaCustody", component_name: "LifeCycleLog", desc: "MegaCustody lifecycle logs" },
-];
+const APPS = ["MegaCash", "MegaCor", "MegaCustody", "MegaCommon"];
+
+const COMPONENTS_MAP: Record<string, { name: string; desc: string }[]> = {
+  MegaCash: [
+    { name: "BasicStruct", desc: "Infrastructure structural logs" },
+    { name: "Default", desc: "General application logs" },
+    { name: "IODevices", desc: "Peripheral and IO logs" },
+    { name: "LifeCycleLog", desc: "Execution lifecycle auditing" },
+    { name: "MegaCashmapping", desc: "Data mapping and transformation" },
+    { name: "MegaCashSLALogger", desc: "SLA tracking and performance" },
+    { name: "Persistence", desc: "Transactional database logs" },
+  ],
+  MegaCor: [
+    { name: "BasicStruct", desc: "Infrastructure structural logs" },
+    { name: "Default", desc: "General application logs" },
+    { name: "IODevices", desc: "Peripheral and IO logs" },
+    { name: "LifeCycleLog", desc: "Execution lifecycle auditing" },
+    { name: "MegaCorNotification", desc: "System notification service" },
+    { name: "MegaCorSLALogger", desc: "SLA tracking and performance" },
+    { name: "Persistence", desc: "Transactional database logs" },
+    { name: "QuartzScheduler", desc: "Scheduled job execution" },
+  ],
+  MegaCustody: [
+    { name: "BasicStruct", desc: "Infrastructure structural logs" },
+    { name: "Default", desc: "General application logs" },
+    { name: "ExportImportConfig", desc: "Configuration migration logs" },
+    { name: "IODevices", desc: "Peripheral and IO logs" },
+    { name: "LifeCycleLog", desc: "Execution lifecycle auditing" },
+    { name: "MegaCustodySLALogger", desc: "SLA tracking and performance" },
+    { name: "Persistence", desc: "Transactional database logs" },
+    { name: "QuartzScheduler", desc: "Scheduled job execution" },
+  ],
+  MegaCommon: [
+    { name: "BasicStruct", desc: "Infrastructure structural logs" },
+    { name: "Default", desc: "General application logs" },
+    { name: "IODevices", desc: "Peripheral and IO logs" },
+    { name: "LifeCycleLog", desc: "Execution lifecycle auditing" },
+    { name: "MegaCommonmapping", desc: "Data mapping and transformation" },
+    { name: "MegaCommonSLALogger", desc: "SLA tracking and performance" },
+    { name: "Persistence", desc: "Transactional database logs" },
+    { name: "QuartzScheduler", desc: "Scheduled job execution" },
+    { name: "UploadedFiles", desc: "File upload management logs" },
+  ],
+};
 
 export default function LogIngestionPage() {
-  const [selectedTarget, setSelectedTarget] = useState(TARGETS[0]);
+  const [selectedApp, setSelectedApp] = useState(APPS[0]);
+  const [selectedComponent, setSelectedComponent] = useState(COMPONENTS_MAP[APPS[0]][0].name);
   const [file, setFile] = useState<File | null>(null);
   const [ingesting, setIngesting] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+
+  const availableComponents = useMemo(() => {
+    return COMPONENTS_MAP[selectedApp] || [];
+  }, [selectedApp]);
+
+  const handleAppChange = (app: string) => {
+    setSelectedApp(app);
+    setSelectedComponent(COMPONENTS_MAP[app][0].name);
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = e.target.files?.[0] || null;
+    if (selectedFile) {
+      const isAllowed = [".log", ".txt"].some(ext => selectedFile.name.toLowerCase().endsWith(ext));
+      if (!isAllowed) {
+        toast.error("Invalid format: Only .log and .txt files are accepted.");
+        e.target.value = "";
+        return;
+      }
+    }
+    setFile(selectedFile);
+    setFailed(false);
+    setUploadProgress(0);
+  };
 
   const handleUpload = async () => {
     if (!file) return;
 
+    // File size check: 100 MB limit
+    const MAX_SIZE = 100 * 1024 * 1024;
+    if (file.size > MAX_SIZE) {
+      toast.error("File size exceeds 100MB limit. Please upload a smaller log file.");
+      return;
+    }
+
+    // Final validation check for file format
+    const isAllowed = [".log", ".txt"].some(ext => file.name.toLowerCase().endsWith(ext));
+    if (!isAllowed) {
+      toast.error("Processing aborted: file is not .log or .txt");
+      return;
+    }
+
+    setFailed(false);
     setIngesting(true);
+    setUploadProgress(0);
     const tid = toast.loading("Uploading log file to backend...");
 
     try {
       const formData = new FormData();
       formData.append("file", file);
-      formData.append("application_key", selectedTarget.application_key);
-      formData.append("component_name", selectedTarget.component_name);
+      formData.append("application_key", selectedApp);
+      formData.append("component_name", selectedComponent);
 
-      const res = await uploadLogFile(formData);
+      const res = await uploadLogFile(formData, (pct) => {
+        setUploadProgress(pct);
+      });
+
       if (res.error) throw new Error(res.error);
 
       setIngesting(false);
       setFile(null);
+      setUploadProgress(0);
       toast.success(`Uploaded ${res.data?.stored_file_name ?? file.name}`, { id: tid });
     } catch (err) {
       setIngesting(false);
+      setUploadProgress(0);
       toast.error(err instanceof Error ? err.message : "Upload failed", { id: tid });
     }
   };
@@ -406,24 +495,48 @@ export default function LogIngestionPage() {
           {/* Étape 1: Application Selection */}
           <div className="glass-card rounded-2xl border border-white/5 p-6">
             <h3 className="text-[10px] font-black uppercase tracking-widest text-cyan-500 mb-4 flex items-center gap-2">
-              <Database className="h-3 w-3" /> Step 1: Target Application
+              <Database className="h-3 w-3" /> Step 1: Select Application
             </h3>
             <div className="grid gap-3 sm:grid-cols-2">
-              {TARGETS.map((target) => {
-                const id = `${target.application_key}/${target.component_name}`;
-                const active = selectedTarget.application_key === target.application_key && selectedTarget.component_name === target.component_name;
+              {APPS.map((app) => {
+                const active = selectedApp === app;
                 return (
                 <button
-                  key={id}
-                  onClick={() => setSelectedTarget(target)}
+                  key={app}
+                  onClick={() => handleAppChange(app)}
                   className={`flex flex-col gap-1 p-4 rounded-xl border text-left transition-all ${
                     active
                       ? "bg-cyan-500/10 border-cyan-500 shadow-[0_0_15px_rgba(6,182,212,0.2)]" 
                       : "bg-white/5 border-white/5 hover:border-white/10"
                   }`}
                 >
-                  <span className={`font-mono text-xs font-bold ${active ? "text-cyan-400" : "text-slate-300"}`}>{id}</span>
-                  <span className="text-[10px] text-muted-foreground leading-tight">{target.desc}</span>
+                  <span className={`font-mono text-xs font-bold ${active ? "text-cyan-400" : "text-slate-300"}`}>{app}</span>
+                </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Étape 2: Service Selection */}
+          <div className="glass-card rounded-2xl border border-white/5 p-6">
+            <h3 className="text-[10px] font-black uppercase tracking-widest text-cyan-500 mb-4 flex items-center gap-2">
+              <Cpu className="h-3 w-3" /> Step 2: Select Service
+            </h3>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {availableComponents.map((comp) => {
+                const active = selectedComponent === comp.name;
+                return (
+                <button
+                  key={comp.name}
+                  onClick={() => setSelectedComponent(comp.name)}
+                  className={`flex flex-col gap-1 p-4 rounded-xl border text-left transition-all ${
+                    active
+                      ? "bg-cyan-500/10 border-cyan-500 shadow-[0_0_15px_rgba(6,182,212,0.2)]" 
+                      : "bg-white/5 border-white/5 hover:border-white/10"
+                  }`}
+                >
+                  <span className={`font-mono text-xs font-bold ${active ? "text-cyan-400" : "text-slate-300"}`}>{comp.name}</span>
+                  <span className="text-[10px] text-muted-foreground leading-tight">{comp.desc}</span>
                 </button>
                 );
               })}
@@ -433,13 +546,13 @@ export default function LogIngestionPage() {
           {/* Étape 2: Drop Zone */}
           <div className="glass-card rounded-2xl border border-white/5 p-6">
             <h3 className="text-[10px] font-black uppercase tracking-widest text-cyan-500 mb-4 flex items-center gap-2">
-              <Upload className="h-3 w-3" /> Step 2: Upload Source
+              <Upload className="h-3 w-3" /> Step 3: Upload Source
             </h3>
             <label className="relative flex flex-col items-center justify-center border-2 border-dashed border-white/10 rounded-2xl p-10 hover:bg-cyan-500/5 hover:border-cyan-500/40 cursor-pointer transition-all">
               <input 
                 type="file" 
                 className="hidden" 
-                onChange={(e) => setFile(e.target.files?.[0] || null)}
+                onChange={handleFileChange}
                 accept=".log,.txt"
               />
               <div className="flex h-16 w-16 items-center justify-center rounded-full bg-cyan-500/10 text-cyan-500 mb-4">
@@ -464,31 +577,39 @@ export default function LogIngestionPage() {
                   <span className="text-[10px] font-black uppercase">Format Validated</span>
                 </div>
 
-                {ingesting && (
-                  <div className="space-y-2 animate-in fade-in duration-300">
+                {(ingesting || uploadProgress > 0 || failed) && (
+                  <div className="space-y-3 animate-in fade-in duration-300">
                     <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-tighter">
-                      <span className="text-cyan-500 animate-pulse">Uploading to FastAPI...</span>
-                      <span className="text-muted-foreground">pending</span>
+                      <span className={failed ? "text-red-500" : "text-cyan-500 animate-pulse"}>
+                        {failed 
+                          ? "Ingestion Failed" 
+                          : uploadProgress < 100 
+                            ? "Uploading to FastAPI..." 
+                            : "Processing on Backend..."}
+                      </span>
+                      <span className="text-muted-foreground">{uploadProgress}%</span>
                     </div>
                     <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
                       <div 
-                        className="h-full w-1/2 animate-pulse bg-cyan-500 shadow-[0_0_12px_rgba(6,182,212,0.6)]" 
+                        className={`h-full transition-all duration-300 ${failed ? "bg-red-500" : "bg-cyan-500 shadow-[0_0_12px_rgba(6,182,212,0.6)]"}`} 
+                        style={{ width: `${uploadProgress}%` }}
                       />
                     </div>
                   </div>
                 )}
 
                 <div className="bg-black/40 rounded-xl p-4 font-mono text-[10px] text-slate-400 overflow-hidden">
-                  <div className="text-cyan-500 mb-2">// Backend target</div>
-                  <div>application_key={selectedTarget.application_key}</div>
-                  <div>component_name={selectedTarget.component_name}</div>
+                  <div className="text-cyan-500 mb-2">// Destination Path</div>
+                  <div className="truncate">raw/{selectedApp.toLowerCase()}/{selectedComponent.toLowerCase()}</div>
                 </div>
                 <button
                   onClick={handleUpload}
                   disabled={ingesting}
-                  className="w-full rounded-xl bg-cyan-500 py-3 text-[10px] font-black uppercase tracking-widest text-[#05080d] shadow-lg shadow-cyan-900/40 hover:scale-105 transition-all"
+                  className={`w-full rounded-xl py-3 text-[10px] font-black uppercase tracking-widest text-[#05080d] shadow-lg transition-all hover:scale-105 ${
+                    failed ? "bg-amber-500 shadow-amber-900/40" : "bg-cyan-500 shadow-cyan-900/40"
+                  }`}
                 >
-                  {ingesting ? <Loader2 className="mx-auto h-4 w-4 animate-spin" /> : "Start Ingestion"}
+                  {ingesting ? <Loader2 className="mx-auto h-4 w-4 animate-spin" /> : failed ? "Retry Ingestion" : "Start Ingestion"}
                 </button>
               </div>
             ) : (

@@ -5,10 +5,10 @@ from datetime import datetime
 import os
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
-from sqlalchemy import text
-from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status  # type: ignore[import]
+from sqlalchemy import text  # type: ignore[import]
+from sqlalchemy.exc import SQLAlchemyError  # type: ignore[import]
+from sqlalchemy.orm import Session  # type: ignore[import]
 
 from app.db.session import get_db_session
 
@@ -16,75 +16,44 @@ router = APIRouter(prefix="/api/logs", tags=["logs-upload"])
 
 ALLOWED_APPLICATIONS: dict[str, set[str]] = {
     "MegaCash": {
-        "Persistence",
-        "MegaCashSLALogger",
-        "MegaCashGetLazy",
-        "MegaCashmapping",
-        "MegaBroker",
-        "MegaCashCacheViewLog",
-        "EasyTest",
-        "ExportImportConfig",
+        "BasicStruct",
+        "Default",
         "IODevices",
         "LifeCycleLog",
-        "logInit",
-        "Default",
-        "BasicStruct",
-        "BroadcastLogger",
+        "MegaCashmapping",
+        "MegaCashSLALogger",
+        "Persistence",
     },
     "MegaCor": {
-        "Persistence",
-        "QuartzScheduler",
-        "MegaCorSLALogger",
-        "MegaBroker",
-        "MegaCorCacheViewLog",
-        "MegaCorGetLazy",
-        "MegaCormapping",
+        "BasicStruct",
+        "Default",
+        "IODevices",
+        "LifeCycleLog",
         "MegaCorNotification",
-        "Default",
-        "EasyTest",
-        "ExportImportConfig",
-        "IODevices",
-        "LifeCycleLog",
-        "logInit",
-        "BasicStruct",
-        "BroadcastLogger",
-        "DCLogger",
-    },
-    "MegaCommon": {
-        "UploadedFiles",
-        "QuartzScheduler",
+        "MegaCorSLALogger",
         "Persistence",
-        "MegaCommonSLALogger",
-        "MegaCommonmapping",
-        "MegaBroker",
-        "MegaCommonCacheViewLog",
-        "MegaCommonGetLazy",
-        "IODevices",
-        "LifeCycleLog",
-        "logInit",
-        "Default",
-        "EasyTest",
-        "ExportImportConfig",
-        "BroadcastLogger",
-        "BasicStruct",
+        "QuartzScheduler",
     },
     "MegaCustody": {
-        "Persistence",
-        "QuartzScheduler",
-        "SLALogger",
-        "MegaCustodymapping",
-        "MegaCustodySLALogger",
-        "MegaBroker",
-        "MegaCustodyCacheViewLog",
-        "MegaCustodyGetLazy",
-        "LifeCycleLog",
-        "logInit",
+        "BasicStruct",
         "Default",
-        "EasyTest",
         "ExportImportConfig",
         "IODevices",
+        "LifeCycleLog",
+        "MegaCustodySLALogger",
+        "Persistence",
+        "QuartzScheduler",
+    },
+    "MegaCommon": {
         "BasicStruct",
-        "BroadcastLogger",
+        "Default",
+        "IODevices",
+        "LifeCycleLog",
+        "MegaCommonmapping",
+        "MegaCommonSLALogger",
+        "Persistence",
+        "QuartzScheduler",
+        "UploadedFiles",
     },
 }
 

@@ -1,4 +1,5 @@
 <<<<<<< HEAD
+<<<<<<< HEAD
 ﻿const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
@@ -155,6 +156,9 @@ export function runMLScoring() {
 }
 =======
 ﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿// lib/api.ts
+=======
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿// lib/api.ts
+>>>>>>> 22f3de9 (Initial LogVision commit)
 import { getAuthToken } from "./auth";
 
 function resolveApiBase() {
@@ -365,7 +369,8 @@ export const getLogs = () => safeFetch("/api/search/logs", {}, { logs: [], total
 export const getAlerts = () => safeFetch("/api/alerts", {}, []);
 export const getAnomalies = () => safeFetch("/api/anomalies", {}, []);
 export const getIncidents = () => safeFetch("/api/incidents", {}, []);
-type UploadLogResponse = {
+
+export type UploadLogResponse = {
   upload_uid?: string;
   original_file_name?: string;
   stored_file_name?: string;
@@ -375,8 +380,39 @@ type UploadLogResponse = {
   status?: string;
 };
 
-export const uploadLogFile = (payload?: unknown) =>
-  safeFetch<UploadLogResponse>("/api/logs/upload", { method: "POST", body: payload as BodyInit }, {});
+export const uploadLogFile = (
+  payload: FormData,
+  onProgress?: (pct: number) => void
+): Promise<SafeResult<UploadLogResponse>> => {
+  return new Promise((resolve) => {
+    const xhr = new XMLHttpRequest();
+    const token = typeof window !== "undefined" ? getAuthToken() : null;
+
+    xhr.open("POST", `${API_BASE}/api/logs/upload`);
+    if (token) xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+
+    if (onProgress) {
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable) {
+          const percentComplete = Math.round((event.loaded / event.total) * 100);
+          onProgress(percentComplete);
+        }
+      };
+    }
+
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve({ data: JSON.parse(xhr.responseText), error: null, usingFallback: false });
+      } else {
+        resolve({ data: {}, error: `http_${xhr.status}`, usingFallback: false });
+      }
+    };
+
+    xhr.onerror = () => resolve({ data: {}, error: "unavailable", usingFallback: true });
+    xhr.send(payload);
+  });
+};
+
 export const getReports = () => safeFetch("/api/reports", {}, []);
 export const getRiskByApplication = () => safeFetch("/api/ml/risk/applications", {}, [
 ]);
@@ -424,6 +460,15 @@ export const getManagerPredictions = (params: any) => {
   });
 };
 
+export const getMLUploads = () => 
+  safeFetch("/api/ml/uploads", {}, []);
+
+export const runDiagnosis = (uploadUid: string) =>
+  safeFetch(`/api/ml/diagnose/${uploadUid}`, { method: "POST" }, { status: "error" });
+
+export const forceResyncPipeline = (uploadUid: string) =>
+  apiPost<{ status: string }>(`/api/ml/process/${uploadUid}`);
+
 export const updateIncidentStatus = (id: string, status: string) =>
   safeFetch(`/api/manager/incidents/${id}`, { method: "PATCH", body: JSON.stringify({ status }) }, { ok: true });
 
@@ -444,6 +489,9 @@ export const searchLogs = (params: any) => {
   const query = new URLSearchParams(cleanParams(params)).toString();
   return safeFetch(`/api/search/logs?${query}`, {}, { logs: [], total: 0 });
 };
+
+export const getSearchTaxonomy = () => 
+  safeFetch<Record<string, string[]>>("/api/search/taxonomy", {}, {});
 
 // ─── Reports ──────────────────────────────────────────────────────────────────
 export const downloadReport = async (type: string, extension: string = "xlsx") => {

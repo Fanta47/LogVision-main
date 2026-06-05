@@ -62,3 +62,14 @@ CREATE TABLE IF NOT EXISTS etl_checkpoint (
   last_source_doc_id TEXT NOT NULL,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+CREATE TABLE IF NOT EXISTS users (
+  id SERIAL PRIMARY KEY,
+  email VARCHAR(255) UNIQUE NOT NULL,
+  name VARCHAR(255),
+  role VARCHAR(50) NOT NULL DEFAULT 'user',
+  password_hash TEXT NOT NULL,
+  active BOOLEAN DEFAULT true,
+  last_active TIMESTAMPTZ DEFAULT NOW(),
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);

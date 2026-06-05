@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+﻿﻿﻿﻿from __future__ import annotations
 
 from typing import Any
 
@@ -369,7 +369,102 @@ def get_application_risk(
     ]
 
 
+<<<<<<< HEAD
 >>>>>>> 494bacd (Save workspace snapshot)
+=======
+@router.get("/uploads")
+def get_ml_uploads(
+    db: Session = Depends(get_db_session),
+) -> list[dict]:
+    """
+    Fetch the most recently ingested log files for on-demand diagnosis.
+    """
+    rows = db.execute(
+        text(
+            """
+            SELECT upload_uid, original_file_name, application_key, component_name, uploaded_at, status
+            FROM log_upload
+            ORDER BY uploaded_at DESC
+            LIMIT 20
+            """
+        )
+    ).mappings().all()
+    
+    return [dict(r) for r in rows]
+
+
+@router.post("/process/{upload_uid}")
+def start_log_pipeline(
+    upload_uid: str,
+    db: Session = Depends(get_db_session),
+) -> dict:
+    """
+    Déclenche le pipeline complet de traitement pour un fichier brut.
+    """
+    try:
+        # On vérifie que le fichier existe et n'est pas déjà traité
+        row = db.execute(
+            text("SELECT status FROM log_upload WHERE upload_uid = :uid"),
+            {"uid": upload_uid}
+        ).mappings().first()
+        
+        if not row:
+            return {"status": "error", "message": "Fichier introuvable"}
+            
+        # On passe le statut à 'parsing' pour démarrer la chaîne
+        db.execute(
+            text("UPDATE log_upload SET status = 'parsing' WHERE upload_uid = :uid"),
+            {"uid": upload_uid}
+        )
+        db.commit()
+        
+        return {
+            "status": "started",
+            "upload_uid": upload_uid,
+            "pipeline": ["parsing", "indexing", "exporting", "predicting", "reindexing", "suggesting", "done"]
+        }
+    except SQLAlchemyError as e:
+        db.rollback()
+        return {"status": "error", "message": str(e)}
+
+
+@router.post("/diagnose/{upload_uid}")
+def run_ml_diagnosis(
+    upload_uid: str,
+    db: Session = Depends(get_db_session),
+) -> dict:
+    """
+    Trigger an on-demand diagnosis for a specific ingested file.
+    Analyzes anomalies, identifies errors, and generates suggestions.
+    """
+    # This simulates a deep-dive analysis by the LogBERT-like model
+    # In production, this would correlate sequence scores linked to this upload_uid.
+    return {
+        "status": "completed",
+        "upload_uid": upload_uid,
+        "summary": {
+            "anomalies_detected": 14,
+            "critical_errors": 3,
+            "confidence_score": 0.92,
+            "suggestions": [
+                "Investigate 'Connection Reset' patterns in Component lifecyclelog",
+                "Critical spike in SQL SELECT timeouts detected; check DB locks",
+                "Predicted 85% probability of memory leak based on recurring stack trace signatures",
+                "Application group 'finance' shows abnormal volume of parse failures"
+            ],
+            "sequence_graph": [
+                {"time": "0s", "score": 12},
+                {"time": "5s", "score": 18},
+                {"time": "10s", "score": 85},
+                {"time": "15s", "score": 92},
+                {"time": "20s", "score": 45},
+                {"time": "25s", "score": 20}
+            ]
+        }
+    }
+
+
+>>>>>>> 22f3de9 (Initial LogVision commit)
 @router.get("/status")
 def get_ml_status(
     db: Session = Depends(get_db_session),

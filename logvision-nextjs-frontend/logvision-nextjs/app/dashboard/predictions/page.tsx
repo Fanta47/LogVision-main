@@ -46,8 +46,9 @@ export default function PredictionsPage() {
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Brain, Database, Loader2, Search, ShieldAlert, Zap, TrendingUp, AlertTriangle, CheckCircle2, ExternalLink, Filter } from "lucide-react";
-import { getManagerPredictions } from "@/lib/api";
+import { Brain, Database, Loader2, Search, ShieldAlert, Zap, TrendingUp, AlertTriangle, CheckCircle2, ExternalLink, Filter, FileText, Cpu, CheckCircle, Activity, PlayCircle } from "lucide-react";
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import { getManagerPredictions, getMLUploads, runDiagnosis, apiPost } from "@/lib/api";
 import { toast } from "sonner";
 
 export default function PredictionsPage() {
@@ -56,11 +57,24 @@ export default function PredictionsPage() {
   const [query, setQuery] = useState("");
   const [showOnlyCritical, setShowOnlyCritical] = useState(false);
 
+  // On-Demand Diagnosis States
+  const [uploads, setUploads] = useState<any[]>([]);
+  const [selectedUid, setSelectedUid] = useState("");
+  const [diagResult, setDiagResult] = useState<any>(null);
+  const [diagnosing, setDiagnosing] = useState(false);
+
   useEffect(() => {
     async function load() {
       setLoading(true);
-      const res = await getManagerPredictions({ limit: 300 });
-      if (res.data) setData(res.data);
+      
+      const [predRes, upRes] = await Promise.all([
+        getManagerPredictions({ limit: 300 }),
+        getMLUploads()
+      ]);
+
+      if (predRes.data) setData(predRes.data);
+      if (upRes.data) setUploads(upRes.data);
+
       setLoading(false);
     }
     load();
@@ -97,6 +111,25 @@ export default function PredictionsPage() {
 
   const handleAcknowledge = (uid: string) => {
     toast.success(`Prédiction ${uid.slice(0,8)} acquittée`);
+  };
+
+  const handleStartFullPipeline = async () => {
+    if (!selectedUid) return;
+    setDiagnosing(true);
+    const res = await apiPost<{status: string}>(`/api/ml/process/${selectedUid}`);
+    if (res.status === "started") {
+      toast.success("Pipeline de traitement envoyé à l'administration");
+    }
+    setDiagnosing(false);
+  };
+
+  const handleDiagnose = async () => {
+    if (!selectedUid) return;
+    setDiagnosing(true);
+    setDiagResult(null);
+    const res = await runDiagnosis(selectedUid);
+    if (res.data) setDiagResult(res.data);
+    setDiagnosing(false);
   };
 
   if (data.score_status === "waiting_for_postgres_scores") {
@@ -144,6 +177,130 @@ export default function PredictionsPage() {
               placeholder="Rechercher..."
               className="w-full rounded-lg border border-white/10 bg-secondary/30 px-3 py-2 pl-10 text-xs font-bold uppercase outline-none focus:ring-1 focus:ring-amber-500 transition-all"
             />
+          </div>
+        </div>
+      </div>
+
+      {/* Deep Analysis Engine Card */}
+      <div className="glass-card mb-8 overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] shadow-2xl backdrop-blur-xl transition-all">
+        <div className="border-b border-white/5 bg-white/5 px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="rounded-lg bg-red-600/20 p-2">
+                <Cpu className="h-5 w-5 text-red-500" />
+              </div>
+              <div>
+                <h2 className="text-sm font-black uppercase tracking-widest text-white">LogBERT Diagnosis Engine</h2>
+                <p className="text-[10px] font-bold text-muted-foreground opacity-60">Analyse on-demand des fichiers ingérés</p>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              {selectedUid && !diagnosing && (
+                <button 
+                  onClick={handleStartFullPipeline}
+                  className="flex items-center gap-2 rounded-lg bg-amber-600 px-4 py-2 text-[10px] font-black uppercase tracking-widest text-white shadow-lg shadow-amber-900/40 transition-all hover:scale-105"
+                >
+                  <PlayCircle className="h-4 w-4" />
+                  Run Start Process
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+        <div className="grid gap-6 p-6 md:grid-cols-2">
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Choisir un fichier source</label>
+              <div className="relative">
+                <FileText className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+                <select 
+                  value={selectedUid}
+                  onChange={(e) => setSelectedUid(e.target.value)}
+                  className="w-full appearance-none rounded-xl border border-white/10 bg-secondary/50 py-3 pl-10 pr-4 text-xs font-black text-white outline-none focus:ring-1 focus:ring-red-600 transition-all"
+                >
+                  <option value="" className="bg-[#0b1220]">Sélectionner un fichier ingéré...</option>
+                  {uploads.map((u: any) => (
+                    <option key={u.upload_uid} value={u.upload_uid} className="bg-[#0b1220]">
+                      {u.original_file_name} — {new Date(u.uploaded_at).toLocaleDateString()}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            {diagnosing && (
+              <div className="flex items-center gap-3 rounded-xl border border-red-500/20 bg-red-500/5 p-4">
+                <Loader2 className="h-5 w-5 animate-spin text-red-500" />
+                <p className="text-[10px] font-black uppercase tracking-widest text-red-400">Exécution du modèle de langage bidirectionnel...</p>
+              </div>
+            )}
+          </div>
+          
+          <div className="min-h-[120px] rounded-2xl border border-white/5 bg-black/40 p-5">
+            {!diagResult && !diagnosing && (
+              <div className="flex h-full flex-col items-center justify-center text-center">
+                <Search className="mb-2 h-8 w-8 text-slate-700" />
+                <p className="text-xs font-bold text-slate-600">Sélectionnez un fichier pour voir les prédictions et suggestions d'analyse.</p>
+              </div>
+            )}
+            {diagResult && !diagnosing && (
+              <div className="space-y-4 animate-in fade-in slide-in-from-right-2 duration-500">
+                <div className="flex items-center justify-between border-b border-white/5 pb-3">
+                  <div className="flex items-center gap-4">
+                    <div className="text-center">
+                      <p className="text-[8px] font-black uppercase tracking-tighter text-red-500">Anomalies</p>
+                      <p className="text-xl font-black text-white">{diagResult.summary.anomalies_detected}</p>
+                    </div>
+                    <div className="h-8 w-px bg-white/10" />
+                    <div className="text-center">
+                      <p className="text-[8px] font-black uppercase tracking-tighter text-red-500">Erreurs</p>
+                      <p className="text-xl font-black text-white">{diagResult.summary.critical_errors}</p>
+                    </div>
+                  </div>
+                  <div className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1">
+                    <p className="text-[9px] font-black uppercase text-emerald-500">Confidence: {Math.round(diagResult.summary.confidence_score * 100)}%</p>
+                  </div>
+                </div>
+                <div>
+                  <p className="mb-2 text-[9px] font-black uppercase tracking-widest text-slate-500">Intelligence Suggestions</p>
+                  <ul className="space-y-2">
+                    {diagResult.summary.suggestions.map((s: string, i: number) => (
+                      <li key={i} className="flex items-start gap-2 text-[10px] font-bold text-slate-200">
+                        <CheckCircle2 className="mt-0.5 h-3 w-3 shrink-0 text-emerald-500" />
+                        {s}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                {diagResult.summary.sequence_graph && (
+                  <div className="mt-6 border-t border-white/5 pt-4">
+                    <div className="mb-4 flex items-center justify-between">
+                      <p className="text-[9px] font-black uppercase tracking-widest text-slate-500">Anomaly Pulse Visualization</p>
+                      <Activity className="h-3 w-3 text-red-500 animate-pulse" />
+                    </div>
+                    <div className="h-32 w-full">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <AreaChart data={diagResult.summary.sequence_graph}>
+                          <defs>
+                            <linearGradient id="diagGradient" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="5%" stopColor="#ef4444" stopOpacity={0.3}/>
+                              <stop offset="95%" stopColor="#ef4444" stopOpacity={0}/>
+                            </linearGradient>
+                          </defs>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.05)" />
+                          <XAxis dataKey="time" axisLine={false} tickLine={false} tick={{ fill: "#64748b", fontSize: 8 }} />
+                          <YAxis hide domain={[0, 100]} />
+                          <Tooltip 
+                            contentStyle={{ backgroundColor: "rgba(11, 18, 32, 0.9)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "8px", fontSize: "10px" }} 
+                            itemStyle={{ color: "#ef4444" }}
+                          />
+                          <Area type="monotone" dataKey="score" stroke="#ef4444" fillOpacity={1} fill="url(#diagGradient)" strokeWidth={2} />
+                        </AreaChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>

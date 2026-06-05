@@ -1,5 +1,6 @@
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 ﻿import { Server, Activity } from "lucide-react";
 
 const systems = [
@@ -49,6 +50,9 @@ import { getAdminSystemHealth, restartAdminService } from "@/lib/api";
 =======
 ﻿﻿"use client";
 >>>>>>> cb91247 (Add admin system health endpoints for frontend dashboard)
+=======
+﻿﻿﻿﻿"use client";
+>>>>>>> 22f3de9 (Initial LogVision commit)
 
 import { useEffect, useState } from "react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
@@ -159,6 +163,8 @@ export default function AdminSystemPage() {
             <tr>
               <th className="px-6 py-3 text-left">Container Name</th>
               <th className="px-6 py-3 text-left">Status</th>
+              <th className="px-6 py-3 text-left">CPU Load</th>
+              <th className="px-6 py-3 text-left">Memory Usage</th>
               <th className="px-6 py-3 text-left">Uptime</th>
               <th className="px-6 py-3 text-right">Actions</th>
             </tr>
@@ -178,6 +184,12 @@ export default function AdminSystemPage() {
                       {s.status}
                     </span>
                   </div>
+                </td>
+                <td className="px-6 py-4">
+                  <span className="font-mono text-[10px] text-muted-foreground">{s.cpu || "0%"}</span>
+                </td>
+                <td className="px-6 py-4">
+                  <span className="font-mono text-[10px] text-muted-foreground">{s.memory || "0 B"}</span>
                 </td>
                 <td className="px-6 py-4 text-xs text-muted-foreground">{s.uptime}</td>
                 <td className="px-6 py-4 text-right">

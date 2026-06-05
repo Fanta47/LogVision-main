@@ -1,4 +1,5 @@
 <<<<<<< HEAD
+<<<<<<< HEAD
 ﻿import { Users, Wrench } from "lucide-react";
 
 const users = [
@@ -37,22 +38,26 @@ export default function AdminUsersPage() {
             ))}
 =======
 ﻿﻿"use client";
+=======
+﻿﻿﻿﻿﻿﻿﻿﻿"use client";
+>>>>>>> 22f3de9 (Initial LogVision commit)
 
 import { useEffect, useMemo, useState } from "react";
 import { Plus, Search, ShieldCheck, ShieldOff, Trash2, UserCog, X, Clock } from "lucide-react";
 import { createAdminUser, deleteAdminUser, disableAdminUser, enableAdminUser, getAdminUsers, updateAdminUser } from "@/lib/api";
 import { SlideToDeleteModal } from "@/components/SlideToDeleteModal";
+import { toast } from "sonner";
 
-type UserRole = "Admin" | "Manager" | "Analyst";
+type UserRole = "Admin" | "Manager" | "User";
 type UserStatus = "active" | "inactive" | "suspended";
 
 type Row = {
   id: number;
-  user: string;
+  name: string;
   email: string;
   role: UserRole;
-  status: UserStatus;
-  lastActive: string;
+  active: boolean;
+  last_active: string;
 };
 
 type Draft = { user: string; email: string; password: string; role: UserRole };
@@ -60,7 +65,7 @@ type Draft = { user: string; email: string; password: string; role: UserRole };
 const ROLE_BADGE: Record<UserRole, string> = {
   Admin: "bg-red-500/10 text-red-500 border border-red-500/20 shadow-[0_0_10px_rgba(220,38,38,0.2)]",
   Manager: "bg-amber-500/10 text-amber-500 border border-amber-500/20 shadow-[0_0_10px_rgba(245,158,11,0.2)]",
-  Analyst: "bg-blue-500/10 text-blue-500 border border-blue-500/20 shadow-[0_0_10px_rgba(59,130,246,0.2)]",
+  User: "bg-blue-500/10 text-blue-500 border border-blue-500/20 shadow-[0_0_10px_rgba(59,130,246,0.2)]",
 };
 
 const STATUS_BADGE: Record<UserStatus, string> = {
@@ -69,7 +74,7 @@ const STATUS_BADGE: Record<UserStatus, string> = {
   suspended: "bg-slate-500/10 text-slate-400 border border-slate-500/20",
 };
 
-const EMPTY_DRAFT: Draft = { user: "", email: "", password: "", role: "Analyst" };
+const EMPTY_DRAFT: Draft = { user: "", email: "", password: "", role: "User" };
 
 export default function AdminUsersPage() {
   const [rows, setRows] = useState<Row[]>([]);
@@ -84,20 +89,49 @@ export default function AdminUsersPage() {
   const [rowToDelete, setRowToDelete] = useState<Row | null>(null);
   const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
 
+  const fetchUsers = async () => {
+    const r = await getAdminUsers();
+    
+    if (r.error && !r.usingFallback) {
+      toast.error(`Erreur de synchronisation API: ${r.error}`);
+    }
+
+    // Extraction robuste pour supporter les listes directes ou enveloppées (ex: { users: [...] })
+    const rawData = Array.isArray(r.data) 
+      ? r.data 
+      : (r.data as any)?.users || (r.data as any)?.items || [];
+
+    const normalized = rawData.map((u: any) => {
+      const roleRaw = String(u.role || "user").toLowerCase();
+      const normalizedRole =
+        roleRaw === "admin" ? "Admin" :
+        roleRaw === "manager" ? "Manager" :
+        "User";
+      
+      return {
+        ...u,
+        name: u.name || u.user || "",
+        active: typeof u.active === "boolean" ? u.active : u.status === "active",
+        last_active: u.last_active || u.lastActive || "",
+        role: normalizedRole,
+      };
+    }) as Row[];
+
+    setRows(normalized);
+    setDemo(r.usingFallback);
+  };
+
   useEffect(() => {
-    getAdminUsers().then((r) => {
-      setRows((r.data as Row[]) || []);
-      setDemo(r.usingFallback);
-    });
+    fetchUsers();
   }, []);
 
   const filtered = useMemo(() => {
     return rows.filter((r) => {
-      const userName = (r.user || "").toLowerCase();
+      const userName = (r.name || "").toLowerCase();
       const userEmail = (r.email || "").toLowerCase();
       const okSearch = userName.includes(search.toLowerCase()) || userEmail.includes(search.toLowerCase());
       const okRole = roleFilter === "All" || r.role === roleFilter;
-      const okStatus = statusFilter === "All" || r.status === statusFilter;
+      const okStatus = statusFilter === "All" || (statusFilter === "active" ? r.active : !r.active);
       return okSearch && okRole && okStatus;
     });
   }, [rows, search, roleFilter, statusFilter]);
@@ -110,7 +144,7 @@ export default function AdminUsersPage() {
 
   function openEdit(row: Row) {
     setEditing(row);
-    setDraft({ user: row.user, email: row.email, password: "", role: row.role });
+    setDraft({ user: row.name, email: row.email, password: "", role: row.role });
     setEmailError("");
     setModal("edit");
   }
@@ -142,7 +176,12 @@ export default function AdminUsersPage() {
     }
 
     setLoading(true);
-    const res = await createAdminUser({ email: cleanEmail, name: cleanUser, password: cleanPass, role: draft.role });
+    const res = await createAdminUser({ 
+      email: cleanEmail, 
+      name: cleanUser, 
+      password: cleanPass, 
+      role: draft.role.toLowerCase() 
+    });
     if (res.error) {
       setLoading(false);
       if (res.error === "user_exists") {
@@ -157,9 +196,7 @@ export default function AdminUsersPage() {
       return;
     }
     // refetch authoritative list from server
-    const list = await getAdminUsers();
-    setRows((list.data as Row[]) || []);
-    setDemo(list.usingFallback);
+    await fetchUsers();
     setModal(null);
     setLoading(false);
   }
@@ -167,7 +204,10 @@ export default function AdminUsersPage() {
   async function onEdit() {
     if (!editing) return;
     setLoading(true);
-    const res = await updateAdminUser(editing.id, { role: draft.role });
+    const res = await updateAdminUser(editing.id, { 
+      name: draft.user,
+      role: draft.role.toLowerCase() 
+    });
     
     if (res.error) {
       alert(`Erreur lors de la mise à jour : ${res.error}`);
@@ -175,16 +215,14 @@ export default function AdminUsersPage() {
       return;
     }
 
-    const list = await getAdminUsers();
-    setRows((list.data as Row[]) || []);
-    setDemo(list.usingFallback);
+    await fetchUsers();
     setModal(null);
     setLoading(false);
   }
 
   async function onToggleStatus(row: Row) {
     setLoading(true);
-    const res = row.status === "active" 
+    const res = row.active
       ? await disableAdminUser(row.id) 
       : await enableAdminUser(row.id);
 
@@ -195,8 +233,7 @@ export default function AdminUsersPage() {
     }
 
     // Refresh list to see actual status from Postgres
-    const list = await getAdminUsers();
-    setRows((list.data as Row[]) || []);
+    await fetchUsers();
     setLoading(false);
   }
 
@@ -216,9 +253,7 @@ export default function AdminUsersPage() {
     }
 
     // Refresh list to verify deletion in Postgres
-    const list = await getAdminUsers();
-    setRows((list.data as Row[]) || []);
-    setDemo(list.usingFallback);
+    await fetchUsers();
     setRowToDelete(null);
     setLoading(false);
   }
@@ -251,7 +286,7 @@ export default function AdminUsersPage() {
           <option value="All">Tous les rôles</option>
           <option value="Admin">Administrateurs</option>
           <option value="Manager">Managers</option>
-          <option value="Analyst">Analystes</option>
+          <option value="User">Utilisateurs</option>
         </select>
         <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as "All" | UserStatus)} className="rounded-lg border border-border bg-secondary/30 px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-red-600 transition-all">
           <option value="All">Tous les statuts</option>
@@ -278,28 +313,28 @@ export default function AdminUsersPage() {
                 <td className="px-5 py-4">
                   <div className="flex items-center gap-3">
                     <div className={`flex h-9 w-9 items-center justify-center rounded-full text-xs font-black border border-white/10 ${r.role === 'Admin' ? 'bg-red-500/20 text-red-500' : 'bg-secondary text-muted-foreground'}`}>
-                      {(r.user || "??").substring(0, 2).toUpperCase()}
+                      {(r.name || "??").substring(0, 2).toUpperCase()}
                     </div>
                     <div>
-                      <p className="font-bold tracking-tight">{r.user || "Utilisateur"}</p>
+                      <p className="font-bold tracking-tight">{r.name || "Utilisateur"}</p>
                       <p className="text-[11px] text-muted-foreground/70">{r.email}</p>
                     </div>
                   </div>
                 </td>
                 <td className="px-5 py-4">
-                  <span className={`rounded-full px-2.5 py-0.5 text-[9px] font-black uppercase tracking-tighter ${ROLE_BADGE[r.role]}`}>
+                  <span className={`rounded-full px-2.5 py-0.5 text-[9px] font-black uppercase tracking-tighter ${ROLE_BADGE[r.role as UserRole] || ROLE_BADGE.User}`}>
                     {r.role}
                   </span>
                 </td>
                 <td className="px-5 py-4">
-                  <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[9px] font-black uppercase tracking-tighter ${STATUS_BADGE[r.status]}`}>
-                    <span className={`h-1 w-1 rounded-full bg-current ${r.status === 'active' && 'animate-pulse'}`} />
-                    {r.status}
+                  <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[9px] font-black uppercase tracking-tighter ${r.active ? STATUS_BADGE.active : STATUS_BADGE.inactive}`}>
+                    <span className={`h-1 w-1 rounded-full bg-current ${r.active && 'animate-pulse'}`} />
+                    {r.active ? 'active' : 'inactive'}
                   </span>
                 </td>
                 <td className="px-5 py-4">
                   <div className="flex items-center gap-1.5 text-xs text-muted-foreground/80 font-mono">
-                    <Clock className="h-3 w-3 opacity-40" /> {r.lastActive}
+                    <Clock className="h-3 w-3 opacity-40" /> {r.last_active ? new Date(r.last_active).toLocaleDateString() : 'Jamais'}
                   </div>
                 </td>
                 <td className="px-5 py-4">
@@ -313,10 +348,10 @@ export default function AdminUsersPage() {
                     </button>
                     <button 
                       onClick={() => onToggleStatus(r)} 
-                      className={`p-2 rounded-lg transition-all ${r.status === 'active' ? 'text-muted-foreground hover:bg-red-500/10 hover:text-red-500' : 'text-emerald-500 hover:bg-emerald-500/10'}`}
-                      title={r.status === "active" ? "Désactiver" : "Activer"}
+                      className={`p-2 rounded-lg transition-all ${r.active ? 'text-muted-foreground hover:bg-red-500/10 hover:text-red-500' : 'text-emerald-500 hover:bg-emerald-500/10'}`}
+                      title={r.active ? "Désactiver" : "Activer"}
                     >
-                      {r.status === "active" ? <ShieldOff className="h-4 w-4" /> : <ShieldCheck className="h-4 w-4" />}
+                      {r.active ? <ShieldOff className="h-4 w-4" /> : <ShieldCheck className="h-4 w-4" />}
                     </button>
                     <button 
                       onClick={() => openDeleteConfirm(r)} 
@@ -359,9 +394,9 @@ export default function AdminUsersPage() {
                   <input value={draft.password} type="password" onChange={(e) => setDraft({ ...draft, password: e.target.value })} placeholder="Mot de passe initial" className="w-full rounded border border-border bg-secondary px-3 py-2 text-sm" />
                 </>
               )}
-              {modal === "edit" && <p className="text-sm text-muted-foreground">Modification du rôle pour <span className="font-semibold text-foreground">{editing?.user}</span></p>}
+              {modal === "edit" && <p className="text-sm text-muted-foreground">Modification du rôle pour <span className="font-semibold text-foreground">{editing?.name}</span></p>}
               <select value={draft.role} onChange={(e) => setDraft({ ...draft, role: e.target.value as UserRole })} className="w-full rounded border border-border bg-secondary px-3 py-2 text-sm">
-                <option value="Admin">Admin</option><option value="Manager">Manager</option><option value="Analyst">Analyst</option>
+                <option value="Admin">Admin</option><option value="Manager">Manager</option><option value="User">User</option>
               </select>
             </div>
             <div className="mt-5 flex justify-end gap-2">
@@ -382,7 +417,7 @@ export default function AdminUsersPage() {
         isOpen={!!rowToDelete}
         onClose={() => setRowToDelete(null)}
         onConfirm={onConfirmDelete}
-        itemName={rowToDelete?.user || ""}
+        itemName={rowToDelete?.name || ""}
       />
 >>>>>>> 494bacd (Save workspace snapshot)
     </div>

@@ -1,4 +1,5 @@
 <<<<<<< HEAD
+<<<<<<< HEAD
 ﻿import Link from "next/link";
 
 export default function ReportsPage() {
@@ -111,6 +112,9 @@ export default function ReportsPage() {
 }
 =======
 ﻿﻿"use client";
+=======
+﻿﻿﻿﻿"use client";
+>>>>>>> 22f3de9 (Initial LogVision commit)
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -128,6 +132,7 @@ import {
   ChevronRight,
   Filter as FilterIcon,
   Check,
+  Cpu,
 } from "lucide-react";
 import { apiGet } from "@/lib/api";
 import type { MlAnomaly } from "@/types/ml";
@@ -181,6 +186,29 @@ export default function ReportsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedApps, setSelectedApps] = useState<string[]>([]);
+  const [selectedComponents, setSelectedComponents] = useState<string[]>([]);
+
+  useEffect(() => {
+    // Restauration des filtres au chargement du composant
+    const saved = localStorage.getItem("logvision_report_filters");
+    if (saved) {
+      try {
+        const { apps, components } = JSON.parse(saved);
+        if (Array.isArray(apps)) setSelectedApps(apps);
+        if (Array.isArray(components)) setSelectedComponents(components);
+      } catch (err) {
+        console.warn("Échec de la restauration des filtres de rapport :", err);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    // Sauvegarde automatique à chaque changement de sélection
+    localStorage.setItem("logvision_report_filters", JSON.stringify({ 
+      apps: selectedApps, 
+      components: selectedComponents 
+    }));
+  }, [selectedApps, selectedComponents]);
 
   useEffect(() => {
     async function loadReportData() {
@@ -204,14 +232,30 @@ export default function ReportsPage() {
     return Array.from(new Set(records.map((r) => r.application_key))).sort();
   }, [records]);
 
-  const filteredRecords = useMemo(() => {
-    if (selectedApps.length === 0) return records;
-    return records.filter((r) => selectedApps.includes(r.application_key));
+  const uniqueComponents = useMemo(() => {
+    const relevantRecords = selectedApps.length > 0 
+      ? records.filter(r => selectedApps.includes(r.application_key))
+      : records;
+    return Array.from(new Set(relevantRecords.map((r) => r.component_name))).sort();
   }, [records, selectedApps]);
+
+  const filteredRecords = useMemo(() => {
+    return records.filter((r) => {
+      const appMatch = selectedApps.length === 0 || selectedApps.includes(r.application_key);
+      const compMatch = selectedComponents.length === 0 || selectedComponents.includes(r.component_name);
+      return appMatch && compMatch;
+    });
+  }, [records, selectedApps, selectedComponents]);
 
   const toggleApp = (app: string) => {
     setSelectedApps(prev => 
       prev.includes(app) ? prev.filter(a => a !== app) : [...prev, app]
+    );
+  };
+
+  const toggleComponent = (comp: string) => {
+    setSelectedComponents(prev => 
+      prev.includes(comp) ? prev.filter(c => c !== comp) : [...prev, comp]
     );
   };
 
@@ -321,8 +365,8 @@ export default function ReportsPage() {
 
         <div className="flex items-center gap-3">
           <button
-            onClick={() => setSelectedApps([])}
-            className={`px-3 py-2 text-[10px] font-black uppercase tracking-widest transition ${selectedApps.length > 0 ? 'text-red-500 hover:underline' : 'hidden'}`}
+            onClick={() => { setSelectedApps([]); setSelectedComponents([]); }}
+            className={`px-3 py-2 text-[10px] font-black uppercase tracking-widest transition ${ (selectedApps.length > 0 || selectedComponents.length > 0) ? 'text-red-500 hover:underline' : 'hidden'}`}
           >
             Reset Filters
           </button>
@@ -357,31 +401,62 @@ export default function ReportsPage() {
 
       {!loading && !error && (
         <>
-          {/* Multi-Select Application Filter */}
-          <div className="mb-6 glass-card rounded-2xl border border-white/5 bg-white/[0.02] p-4 print:hidden">
-            <div className="mb-3 flex items-center gap-2 px-1">
-              <FilterIcon className="h-3 w-3 text-red-500" />
-              <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Filter by Application</span>
+          {/* Advanced Multi-Select Filters */}
+          <div className="mb-6 grid gap-4 md:grid-cols-2 print:hidden">
+            {/* Application Filter */}
+            <div className="glass-card rounded-2xl border border-white/5 bg-white/[0.02] p-4">
+              <div className="mb-3 flex items-center gap-2 px-1">
+                <FilterIcon className="h-3 w-3 text-red-500" />
+                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Filter by Application</span>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {uniqueApps.map(app => {
+                  const isSelected = selectedApps.includes(app);
+                  return (
+                    <button
+                      key={app}
+                      onClick={() => toggleApp(app)}
+                      className={`flex items-center gap-2 rounded-lg border px-3 py-1.5 text-[11px] font-bold transition-all duration-300 ${
+                        isSelected 
+                          ? "border-red-500/50 bg-red-500/10 text-red-500 shadow-[0_0_15px_rgba(239,68,68,0.1)]" 
+                          : "border-white/10 bg-white/5 text-slate-400 hover:bg-white/10"
+                      }`}
+                    >
+                      {isSelected && <Check className="h-3 w-3" />}
+                      {app}
+                    </button>
+                  );
+                })}
+                {uniqueApps.length === 0 && <span className="text-xs text-slate-600 italic px-1">No applications found.</span>}
+              </div>
             </div>
-            <div className="flex flex-wrap gap-2">
-              {uniqueApps.map(app => {
-                const isSelected = selectedApps.includes(app);
-                return (
-                  <button
-                    key={app}
-                    onClick={() => toggleApp(app)}
-                    className={`flex items-center gap-2 rounded-lg border px-3 py-1.5 text-[11px] font-bold transition-all duration-300 ${
-                      isSelected 
-                        ? "border-red-500/50 bg-red-500/10 text-red-500 shadow-[0_0_15px_rgba(239,68,68,0.1)]" 
-                        : "border-white/10 bg-white/5 text-slate-400 hover:bg-white/10"
-                    }`}
-                  >
-                    {isSelected && <Check className="h-3 w-3" />}
-                    {app}
-                  </button>
-                );
-              })}
-              {uniqueApps.length === 0 && <span className="text-xs text-slate-600 italic px-1">No applications found in current records.</span>}
+
+            {/* Component / Service Filter */}
+            <div className="glass-card rounded-2xl border border-white/5 bg-white/[0.02] p-4">
+              <div className="mb-3 flex items-center gap-2 px-1">
+                <Cpu className="h-3 w-3 text-red-500" />
+                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Filter by Service / Component</span>
+              </div>
+              <div className="flex flex-wrap gap-2 max-h-[120px] overflow-y-auto pr-2 custom-scrollbar">
+                {uniqueComponents.map(comp => {
+                  const isSelected = selectedComponents.includes(comp);
+                  return (
+                    <button
+                      key={comp}
+                      onClick={() => toggleComponent(comp)}
+                      className={`flex items-center gap-2 rounded-lg border px-3 py-1.5 text-[11px] font-bold transition-all duration-300 ${
+                        isSelected 
+                          ? "border-red-500/50 bg-red-500/10 text-red-500 shadow-[0_0_15px_rgba(239,68,68,0.1)]" 
+                          : "border-white/10 bg-white/5 text-slate-400 hover:bg-white/10"
+                      }`}
+                    >
+                      {isSelected && <Check className="h-3 w-3" />}
+                      {comp}
+                    </button>
+                  );
+                })}
+                {uniqueComponents.length === 0 && <span className="text-xs text-slate-600 italic px-1">Select an application first.</span>}
+              </div>
             </div>
           </div>
 

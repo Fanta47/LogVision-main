@@ -7,6 +7,7 @@ export default function ProfilePage() {
 import { useEffect, useState, useMemo } from "react";
 import { User, Mail, Lock, Save, Shield, Palette, Bell, Volume2, Monitor, Calendar, Eye, EyeOff } from "lucide-react";
 import { getProfile, updateProfile, updatePassword } from "@/lib/api";
+import { getSession } from "@/lib/auth";
 import { toast } from "sonner";
 
 export default function ProfilePage() {
@@ -21,6 +22,11 @@ export default function ProfilePage() {
   const [accountForm, setAccountForm] = useState({ name: "", email: "", department: "" });
   const [securityForm, setSecurityForm] = useState({ current: "", new: "", confirm: "" });
   const [prefs, setPrefs] = useState({ emailNotif: true, criticalAudio: true, desktopAlerts: false, weeklyDigest: true, showKibana: true });
+
+  const sessionUser = useMemo(() => {
+    if (typeof window === "undefined") return null;
+    return getSession();
+  }, []);
 
   useEffect(() => {
     const savedPrefs = localStorage.getItem("logvision_prefs");
@@ -101,18 +107,28 @@ export default function ProfilePage() {
       {/* Header Sticky */}
       {/* Définition des styles par rôle pour la cohérence visuelle */}
       {(() => {
-        const role = data?.role || "Analyst";
+        // Prioritize session role as truth, fall back to API data or default
+        const roleRaw = (sessionUser?.role || data?.role || "Analyst").toLowerCase();
+        
+        // Standardize role names for theme mapping
+        const role = (
+          roleRaw === "admin" ? "Admin" : 
+          roleRaw === "manager" ? "Manager" : "Analyst"
+        ) as "Admin" | "Manager" | "Analyst";
+
         const roleStyles = {
           Admin: { bg: "bg-red-600/20", text: "text-red-500", border: "border-red-500/30", shadow: "shadow-red-900/20", badge: "bg-red-600" },
           Manager: { bg: "bg-amber-600/20", text: "text-amber-500", border: "border-amber-500/30", shadow: "shadow-amber-900/20", badge: "bg-amber-600" },
           Analyst: { bg: "bg-cyan-600/20", text: "text-cyan-400", border: "border-cyan-500/30", shadow: "shadow-cyan-900/20", badge: "bg-cyan-600" },
         }[role as "Admin" | "Manager" | "Analyst"] || { bg: "bg-emerald-600/20", text: "text-emerald-500", border: "border-emerald-500/30", shadow: "shadow-emerald-900/20", badge: "bg-emerald-600" };
 
+        const displayName = data?.user || sessionUser?.name || "User";
+
         return (
       <div className="sticky top-0 z-20 flex items-center justify-between border-b border-border/50 bg-background/80 py-4 backdrop-blur-md">
         <div className="flex items-center gap-4">
           <div className={`relative flex h-14 w-14 items-center justify-center rounded-full text-xl font-black border shadow-lg transition-all ${roleStyles.bg} ${roleStyles.text} ${roleStyles.border} ${roleStyles.shadow}`}>
-            {role === "Admin" ? "A" : (data?.user?.[0] || "U").toUpperCase()}
+            {role === "Admin" ? "A" : (displayName[0] || "U").toUpperCase()}
             <span className="absolute bottom-0.5 right-0.5 flex h-3.5 w-3.5">
               <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${status === "En ligne" ? "bg-emerald-400" : status === "Occupé" ? "bg-amber-400" : "bg-red-400"}`}></span>
               <span className={`relative inline-flex rounded-full h-3.5 w-3.5 border-2 border-background ${status === "En ligne" ? "bg-emerald-500" : status === "Occupé" ? "bg-amber-500" : "bg-red-600"}`}></span>
@@ -121,10 +137,10 @@ export default function ProfilePage() {
           <div>
             <div className="flex flex-col gap-1">
               <div className="flex items-center gap-3">
-                <span className={`rounded-full px-2 py-1 font-black uppercase text-[10px] text-white shadow-lg transition-colors ${roleStyles.badge}`}>{role === "Analyst" ? "Support / Analyst" : role}</span>
-                <span className="text-lg font-black tracking-tight text-white">{data?.user}</span>
+                <span className={`rounded-full px-2 py-1 font-black uppercase text-[10px] text-white shadow-lg transition-colors ${roleStyles.badge}`}>{role}</span>
+                <span className="text-lg font-black tracking-tight text-white">{displayName}</span>
               </div>
-              <span className="text-[11px] font-medium text-muted-foreground">{data?.email}</span>
+              <span className="text-[11px] font-medium text-muted-foreground">{data?.email || sessionUser?.email}</span>
               <select 
                 value={status} title="Account Status"
                 onChange={(e) => handleStatusChange(e.target.value as any)}

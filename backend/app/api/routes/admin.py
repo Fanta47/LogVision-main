@@ -7,21 +7,42 @@ from app.db.session import get_db_session
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
 
+ROLE_ALIASES = {
+    "admin": "admin",
+    "manager": "manager",
+    "user": "user",
+    "analyst": "user",
+}
+
+
+def _normalize_role(value: object) -> str:
+    raw = str(value or "user").strip().lower()
+    return ROLE_ALIASES.get(raw, "user")
+
+
 def _ensure_users_table(db: Session):
-    # Create a simple users table if it doesn't exist so endpoints work on fresh DBs
+    # Keep the app-compatible user schema present on fresh and existing DBs.
     db.execute(text(
         """
         CREATE TABLE IF NOT EXISTS users (
-            id BIGSERIAL PRIMARY KEY,
-            email TEXT UNIQUE NOT NULL,
-            name TEXT,
-            role TEXT,
-            password_hash TEXT,
-            active BOOLEAN DEFAULT true,
-            last_active TIMESTAMPTZ
+            id SERIAL PRIMARY KEY,
+            email VARCHAR(255) UNIQUE NOT NULL,
+            name VARCHAR(255),
+            role VARCHAR(50) NOT NULL DEFAULT 'user',
+            password_hash TEXT NOT NULL,
+            active BOOLEAN NOT NULL DEFAULT true,
+            last_active TIMESTAMPTZ DEFAULT NOW(),
+            created_at TIMESTAMPTZ DEFAULT NOW()
         )
         """
     ))
+    db.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS name VARCHAR(255)"))
+    db.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(50) NOT NULL DEFAULT 'user'"))
+    db.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash TEXT"))
+    db.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS active BOOLEAN NOT NULL DEFAULT true"))
+    db.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS last_active TIMESTAMPTZ DEFAULT NOW()"))
+    db.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW()"))
+    db.execute(text("CREATE EXTENSION IF NOT EXISTS pgcrypto"))
     db.commit()
 
 
@@ -29,25 +50,48 @@ def _ensure_users_table(db: Session):
 def list_users(db: Session = Depends(get_db_session)):
     try:
         _ensure_users_table(db)
-        rows = db.execute(text("SELECT id, COALESCE(name, '') AS user, email, COALESCE(role, 'Analyst') AS role, CASE WHEN active THEN 'active' ELSE 'inactive' END AS status, COALESCE(last_active::text, '') AS lastActive FROM users ORDER BY id"))
+        rows = db.execute(text(
+            """
+            SELECT
+                id,
+                COALESCE(name, '') AS name,
+                email,
+                COALESCE(role, 'user') AS role,
+                COALESCE(active, true) AS active,
+                COALESCE(last_active::text, '') AS last_active,
+                COALESCE(created_at::text, '') AS created_at
+            FROM users
+            ORDER BY id
+            """
+        ))
         return [dict(r) for r in rows.mappings().all()]
-    except Exception:
-        # fallback to empty list if DB unavailable
-        return []
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"db_error: {exc}")
 
 
 @router.post("/users")
 def create_user(payload: dict, db: Session = Depends(get_db_session)):
-    email = (payload.get("email") or "").strip()
-    if not email:
+    email = (payload.get("email") or "").strip().lower()
+    password = str(payload.get("password") or "")
+    name = (payload.get("name") or "").strip()
+    role = _normalize_role(payload.get("role"))
+    if not email or not name or len(password) < 8:
         raise HTTPException(status_code=400, detail="invalid_payload")
     try:
         _ensure_users_table(db)
         exists = db.execute(text("SELECT 1 FROM users WHERE lower(email) = lower(:email)"), {"email": email}).scalar()
         if exists:
             raise HTTPException(status_code=409, detail="user_exists")
-        # store provided password as password_hash (no hashing here)
-        res = db.execute(text("INSERT INTO users (email, name, role, password_hash, active) VALUES (:email, :name, :role, :password, true) RETURNING id"), {"email": email, "name": payload.get("name"), "role": payload.get("role", "Analyst"), "password": payload.get("password")})
+        res = db.execute(
+            text(
+                """
+                INSERT INTO users (email, name, role, password_hash, active, last_active)
+                VALUES (:email, :name, :role, crypt(:password, gen_salt('bf', 10)), true, NOW())
+                RETURNING id
+                """
+            ),
+            {"email": email, "name": name, "role": role, "password": password},
+        )
         new_id = res.scalar_one()
         db.commit()
         return {"ok": True, "id": int(new_id)}
@@ -61,11 +105,30 @@ def create_user(payload: dict, db: Session = Depends(get_db_session)):
 def update_user(user_id: int, payload: dict, db: Session = Depends(get_db_session)):
     try:
         _ensure_users_table(db)
+        updates = {}
+        if "name" in payload:
+            updates["name"] = (payload.get("name") or "").strip()
         if "role" in payload:
-            db.execute(text("UPDATE users SET role = :role WHERE id = :id"), {"role": payload["role"], "id": user_id})
-            db.commit()
+            updates["role"] = _normalize_role(payload.get("role"))
+        if not updates:
             return {"ok": True}
+        result = db.execute(
+            text(
+                """
+                UPDATE users
+                SET name = COALESCE(:name, name),
+                    role = COALESCE(:role, role)
+                WHERE id = :id
+                """
+            ),
+            {"id": user_id, "name": updates.get("name"), "role": updates.get("role")},
+        )
+        if result.rowcount == 0:
+            raise HTTPException(status_code=404, detail="not_found")
+        db.commit()
         return {"ok": True}
+    except HTTPException:
+        raise
     except Exception:
         raise HTTPException(status_code=500, detail="db_error")
 
@@ -74,9 +137,13 @@ def update_user(user_id: int, payload: dict, db: Session = Depends(get_db_sessio
 def disable_user(user_id: int, db: Session = Depends(get_db_session)):
     try:
         _ensure_users_table(db)
-        db.execute(text("UPDATE users SET active = false WHERE id = :id"), {"id": user_id})
+        result = db.execute(text("UPDATE users SET active = false WHERE id = :id"), {"id": user_id})
+        if result.rowcount == 0:
+            raise HTTPException(status_code=404, detail="not_found")
         db.commit()
         return {"ok": True}
+    except HTTPException:
+        raise
     except Exception:
         raise HTTPException(status_code=500, detail="db_error")
 
@@ -85,9 +152,13 @@ def disable_user(user_id: int, db: Session = Depends(get_db_session)):
 def enable_user(user_id: int, db: Session = Depends(get_db_session)):
     try:
         _ensure_users_table(db)
-        db.execute(text("UPDATE users SET active = true WHERE id = :id"), {"id": user_id})
+        result = db.execute(text("UPDATE users SET active = true WHERE id = :id"), {"id": user_id})
+        if result.rowcount == 0:
+            raise HTTPException(status_code=404, detail="not_found")
         db.commit()
         return {"ok": True}
+    except HTTPException:
+        raise
     except Exception:
         raise HTTPException(status_code=500, detail="db_error")
 
@@ -96,9 +167,13 @@ def enable_user(user_id: int, db: Session = Depends(get_db_session)):
 def delete_user(user_id: int, db: Session = Depends(get_db_session)):
     try:
         _ensure_users_table(db)
-        db.execute(text("DELETE FROM users WHERE id = :id"), {"id": user_id})
+        result = db.execute(text("DELETE FROM users WHERE id = :id"), {"id": user_id})
+        if result.rowcount == 0:
+            raise HTTPException(status_code=404, detail="not_found")
         db.commit()
         return {"ok": True}
+    except HTTPException:
+        raise
     except Exception:
         raise HTTPException(status_code=500, detail="db_error")
 

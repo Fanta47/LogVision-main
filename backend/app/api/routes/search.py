@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from app.core.config import get_settings
 from app.db.session import get_db_session
 from app.services.search_service import search_logs
+from app.api.routes.upload_logs import ALLOWED_APPLICATIONS
 
 router = APIRouter(prefix='/api/search', tags=['search'])
 
@@ -19,6 +20,15 @@ router = APIRouter(prefix='/api/search', tags=['search'])
 def _iso(value):
     return value.isoformat() if hasattr(value, "isoformat") else value
 >>>>>>> 494bacd (Save workspace snapshot)
+
+
+@router.get('/taxonomy')
+def get_search_taxonomy() -> dict:
+    """
+    Renvoie la taxonomie des applications et de leurs services/composants.
+    Utilisé par le frontend pour filtrer automatiquement les options de recherche.
+    """
+    return {app: sorted(list(comps)) for app, comps in ALLOWED_APPLICATIONS.items()}
 
 
 @router.get('/logs')

@@ -1,6 +1,7 @@
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 ﻿import { Server, Activity } from "lucide-react";
 
 const systems = [
@@ -53,17 +54,22 @@ import { getAdminSystemHealth, restartAdminService } from "@/lib/api";
 =======
 ﻿﻿﻿﻿"use client";
 >>>>>>> 22f3de9 (Initial LogVision commit)
+=======
+﻿﻿﻿﻿﻿﻿"use client";
+>>>>>>> e97c9e7 (Fix: Kibana/Elasticsearch docker-compose configuration and CA path)
 
 import { useEffect, useState } from "react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
-import { Server, Activity, Cpu, Database, RefreshCw, AlertCircle, CheckCircle2, Play } from "lucide-react";
-import { getAdminSystemHealth, restartAdminService } from "@/lib/api";
+import { Server, Activity, Cpu, Database, RefreshCw, AlertCircle, CheckCircle2, Play, Power } from "lucide-react";
+import { getAdminSystemHealth, restartAdminService, restartAllAdminServices } from "@/lib/api";
 import { toast } from "sonner";
 
 export default function AdminSystemPage() {
   const [health, setHealth] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [restarting, setRestarting] = useState<string | null>(null);
+  const [restartingAll, setRestartingAll] = useState(false); // New state for "Restart All"
+  const [selectedServiceId, setSelectedServiceId] = useState<string>("");
   const [cpuHistory, setCpuHistory] = useState<{ time: string; cpu: number }[]>([]);
 
   const fetchHealth = async () => {
@@ -86,20 +92,34 @@ export default function AdminSystemPage() {
 
   useEffect(() => {
     fetchHealth();
-    const interval = setInterval(fetchHealth, 30000); // Refresh auto toutes les 30s
+    const interval = setInterval(fetchHealth, 15000); // Mise à jour plus réactive (15s)
     return () => clearInterval(interval);
   }, []);
 
   const handleRestart = async (serviceId: string) => {
     setRestarting(serviceId);
+    const tid = toast.loading(`Redémarrage du service ${serviceId.slice(0, 8)}...`);
     const res = await restartAdminService(serviceId);
     if (!res.error) {
-      toast.success(`Service ${serviceId} redémarré avec succès`);
-      fetchHealth();
+      toast.success(`Service ${serviceId.slice(0, 8)} redémarré avec succès`, { id: tid });
+      fetchHealth(); // Refresh data after restart
     } else {
-      toast.error(`Erreur lors du redémarrage de ${serviceId}`);
+      toast.error(`Erreur lors du redémarrage de ${serviceId.slice(0, 8)}`, { id: tid });
     }
     setRestarting(null);
+  };
+
+  const handleRestartAll = async () => {
+    setRestartingAll(true);
+    const tid = toast.loading("Redémarrage de tous les services Docker...");
+    const res = await restartAllAdminServices();
+    if (!res.error) {
+      toast.success(`Redémarrage de ${res.data?.restarted_count || 0} services terminé`, { id: tid });
+      fetchHealth(); // Refresh data after restart
+    } else {
+      toast.error(`Erreur lors du redémarrage de tous les services: ${res.error}`, { id: tid });
+    }
+    setRestartingAll(false);
   };
 
   if (loading && !health) return <div className="p-10 text-center animate-pulse">Chargement de l'état des conteneurs...</div>;
@@ -111,9 +131,49 @@ export default function AdminSystemPage() {
           <Server className="h-6 w-6 text-red-600" />
           <h1 className="text-xl font-bold">System Health & Docker Monitor</h1>
         </div>
-        <button onClick={fetchHealth} className="p-2 hover:bg-white/5 rounded-full transition-colors">
-          <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-        </button>
+        
+        <div className="flex items-center gap-4">
+          {/* Quick Restart Dropdown */}
+          <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 p-1.5 pr-3 shadow-xl">
+            <select
+              aria-label="Select Service to Restart"
+              value={selectedServiceId}
+              onChange={(e) => setSelectedServiceId(e.target.value)}
+              className="bg-transparent px-3 py-1 text-[10px] font-black uppercase tracking-widest text-muted-foreground outline-none focus:ring-0"
+            >
+              <option value="" className="bg-[#0b1220]">Select Service to Restart...</option>
+              {health?.services?.map((s: any) => (
+                <option key={s.id} value={s.id} className="bg-[#0b1220]">{s.name} ({s.status})</option>
+              ))}
+            </select>
+            <button
+              disabled={!selectedServiceId || restarting === selectedServiceId || restartingAll}
+              onClick={() => handleRestart(selectedServiceId)}
+              className="flex items-center gap-2 rounded-lg bg-red-600 px-4 py-1.5 text-[10px] font-black uppercase tracking-widest text-white transition-all hover:scale-105 active:scale-95 disabled:opacity-30"
+            >
+              {restarting === selectedServiceId ? <RefreshCw className="h-3 w-3 animate-spin" /> : <Play className="h-3 w-3" />}
+              Quick Restart
+            </button>
+          </div>
+
+          {/* Restart All Button */}
+          <button
+            onClick={handleRestartAll}
+            disabled={restartingAll || loading}
+            className="flex items-center gap-2 rounded-xl border border-red-600/30 bg-red-600/10 px-4 py-2.5 text-[10px] font-black uppercase tracking-widest text-red-500 hover:bg-red-600 hover:text-white transition-all disabled:opacity-30"
+          >
+            {restartingAll ? <RefreshCw className="h-3 w-3 animate-spin" /> : <Power className="h-3 w-3" />}
+            Restart All
+          </button>
+
+          <button 
+            onClick={fetchHealth} 
+            className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-[10px] font-black uppercase tracking-widest text-white hover:bg-white/10 transition-all"
+          >
+            <RefreshCw className={`h-3 w-3 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
+          </button>
+        </div>
       </div>
 
       {/* Métriques Globales */}
@@ -194,7 +254,7 @@ export default function AdminSystemPage() {
                 <td className="px-6 py-4 text-xs text-muted-foreground">{s.uptime}</td>
                 <td className="px-6 py-4 text-right">
                   <button 
-                    disabled={restarting === s.id}
+                    disabled={restarting === s.id || restartingAll}
                     onClick={() => handleRestart(s.id)}
                     className="inline-flex items-center gap-2 rounded-lg bg-red-600/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-red-500 hover:bg-red-600 hover:text-white transition-all disabled:opacity-50"
                   >

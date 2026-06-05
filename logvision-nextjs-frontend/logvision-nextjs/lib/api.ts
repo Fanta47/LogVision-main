@@ -1,5 +1,6 @@
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 ﻿const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
@@ -159,6 +160,9 @@ export function runMLScoring() {
 =======
 ﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿// lib/api.ts
 >>>>>>> 22f3de9 (Initial LogVision commit)
+=======
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿// lib/api.ts
+>>>>>>> e97c9e7 (Fix: Kibana/Elasticsearch docker-compose configuration and CA path)
 import { getAuthToken } from "./auth";
 
 function resolveApiBase() {
@@ -347,6 +351,8 @@ const EMPTY_SYSTEM = {
 export const getAdminSystemHealth = () => safeFetch("/api/admin/system/health", {}, EMPTY_SYSTEM);
 export const restartAdminService = (serviceId: string) =>
   safeFetch(`/api/admin/system/restart/${serviceId}`, { method: "POST" }, { ok: false });
+export const restartAllAdminServices = () =>
+  safeFetch(`/api/admin/system/restart-all`, { method: "POST" }, { ok: false, restarted_count: 0 });
 
 // ─── Admin — Password Requests ────────────────────────────────────────────────
 export const getPasswordResetRequests = () => safeFetch("/api/admin/password-reset-requests", {}, []);
